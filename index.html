@@ -1,0 +1,4546 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>儿童学习陪伴AI交互网页原型</title>
+  <style>
+    /*
+      单文件原型说明（方便你改）：
+      - 页面切换：welcome -> select -> hanziGame -> hanziHW -> mathGame -> mathHW -> summary -> welcome
+      - 选择“识字”后路径锁定，完成前不能回选择页/首页（总结页可回首页）
+      - 底部固定：AI小熊“小暖”(CSS圆头+耳朵+黑眼睛) + 对话框 + 3个情绪按钮（全页可用）
+      - 识字游戏：3题固定题库（emoji图 + 3个词语按钮），答对点亮★并自动下一题
+      - 算术游戏：3题固定题库（30以内加减），数字键盘输入答案，答对点亮★并自动下一题
+      - 书面作业：30分钟倒计时；每10分钟提醒（DEMO_FAST 可改成10秒用于课堂演示）
+    */
+
+    :root{
+      --primary:#FFD966;
+      --primary-deep:#F7C948;
+      --bg:#F0CD67;            /* 统一背景色 */
+      --ink:#2D2A26;
+      --muted:rgba(0,0,0,.58);
+      --shadow: 0 18px 40px rgba(0,0,0,.12);
+      --radius: 26px;
+      --radius-lg: 34px;
+      --line: rgba(0,0,0,.08);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+      --footer-h: 150px;
+      --font: ui-rounded, "Poppins", "Nunito", "SF Pro Rounded", "PingFang SC","Microsoft YaHei", system-ui, sans-serif;
+      --ui-scale: 1;           /* 其余页面恢复原始大小 */
+    }
+
+    *{ box-sizing:border-box; }
+    html,body{ height:100%; }
+    body{
+      margin:0;
+      background: #F0CD67;
+      font-family: var(--font);
+      color: var(--ink);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding: 22px;
+    }
+
+    /* 桌面宽屏：最大1440，内容居中 */
+    .device{
+      width: min(1440px, 100%);
+      min-height: min(900px, 100vh);
+      background: transparent;
+      border-radius: 40px;
+      position:relative;
+    }
+
+    /* 内容区：约1000px居中，底部留出AI区空间 */
+    .content{
+      max-width: 1000px;
+      margin: 0 auto;
+      min-height: 100%;
+      padding: 0 18px calc(var(--footer-h) + 26px) 18px;
+    }
+
+    /* 欢迎页不显示底部AI白色栏（你说的“嗨...”白色板块） */
+    .device.page-welcome .footerAI{
+      display:none;
+    }
+    /* 总结页不显示底部 AI 小熊版块 */
+    .device.page-summary .footerAI{
+      display:none;
+    }
+    .device.page-summary .content{
+      max-width: none;
+      margin: 0;
+      min-height: 100vh;
+      padding: 0;
+    }
+    /* 最后一页：整图铺满 + 热区返回首页 */
+    .device.page-summary{
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      min-height: 100vh;
+      border-radius: 0;
+    }
+    .device.page-summary #page-summary{
+      min-height: 100vh;
+      display:block;
+    }
+    .summaryFull{
+      width: 100vw;
+      height: 100vh;
+      position: relative;
+      background: #FFD966; /* 与第一页一致 */
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .summaryFullImg{
+      width: 100%;
+      height: 100%;
+      object-fit: contain; /* 模仿第一页：完整显示 */
+      object-position: center;
+      display:block;
+      user-select:none;
+      -webkit-user-drag:none;
+    }
+    .summaryHotspot{
+      position:absolute;
+      inset: 0;
+      border: 0;
+      background: transparent;
+      cursor: pointer;
+    }
+    .device.page-welcome .content{
+      padding-bottom: 18px; /* 隐藏底栏后，不需要预留底部空间 */
+    }
+
+    /* ====== 欢迎页：元素版（等比放大 + 居中） ====== */
+    .welcomeCenter{
+      min-height: calc(100vh - 44px);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+    }
+    .welcomeGroup{
+      --welcome-scale: 1.35;
+      transform: scale(var(--welcome-scale));
+      transform-origin: center;
+      display:grid;
+      grid-template-columns: 520px 260px;
+      grid-template-rows: auto auto auto;
+      column-gap: 40px;
+      row-gap: 22px;
+      align-items:center;
+      justify-items:start;
+      padding: 10px 10px 0 10px;
+    }
+    .welcomeTitle{
+      grid-column: 1 / 2;
+      grid-row: 1;
+      font-size: 44px;
+      font-weight: 1200;
+      letter-spacing: .6px;
+      color: rgba(0,0,0,.78);
+      text-shadow: 0 4px 0 rgba(0,0,0,.06);
+      white-space: nowrap;
+    }
+    .welcomeSub{
+      grid-column: 1 / 2;
+      grid-row: 2;
+      font-size: 34px;
+      font-weight: 1100;
+      letter-spacing: .6px;
+      color: rgba(0,0,0,.72);
+      text-shadow: 0 4px 0 rgba(0,0,0,.05);
+      white-space: nowrap;
+    }
+    .welcomeBear{
+      grid-column: 2 / 3;
+      grid-row: 1 / 3;
+      width: 220px;
+      height: 220px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      background: transparent;
+      border-radius: 999px;
+      overflow: hidden; /* 裁成圆形，去掉图片外侧黑底 */
+    }
+    .welcomeBear img{
+      width: 100%;
+      height: 100%;
+      object-fit: cover; /* 充满圆形裁切区域 */
+      display:block;
+    }
+    .welcomeClickBtn{
+      grid-column: 1 / 3;
+      grid-row: 3;
+      justify-self:center;
+      width: 360px;
+      height: 110px;
+      border-radius: 30px;
+      background: #F6E59F;
+      border: 10px solid #B16F35;
+      box-shadow:
+        0 10px 0 rgba(255,255,255,.35) inset,
+        0 18px 36px rgba(0,0,0,.16);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      cursor:pointer;
+      user-select:none;
+      transition: transform .08s ease, filter .15s ease;
+    }
+    .welcomeClickBtn:hover{ filter:saturate(1.05); transform: translateY(-1px); }
+    .welcomeClickBtn:active{ transform: translateY(1px) scale(.99); }
+    .welcomeClickBtn span{
+      font-size: 52px;
+      font-weight: 1200;
+      letter-spacing: 2px;
+      color: #48290D;
+      text-shadow: none;
+    }
+    @media (max-width: 860px){
+      .welcomeGroup{
+        --welcome-scale: 1.12;
+        grid-template-columns: 1fr;
+        grid-template-rows: auto auto auto auto;
+        justify-items:center;
+        text-align:center;
+      }
+      .welcomeTitle,.welcomeSub{ justify-self:center; }
+      .welcomeBear{ grid-column: 1; grid-row: 3; }
+      .welcomeClickBtn{ grid-column: 1; grid-row: 4; width: min(360px, 86vw); height: 110px; }
+    }
+
+    /* 选择页也不显示底部提示板块（“先玩识字游戏...”） */
+    .device.page-select .footerAI{
+      display:none;
+    }
+    .device.page-select .content{
+      padding-bottom: 18px;
+    }
+    .device.page-select{
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      min-height: 100vh;
+      border-radius: 0;
+    }
+    .device.page-select .content{
+      max-width: none;
+      margin: 0;
+      min-height: 100vh;
+      padding: 0;
+    }
+    .selectFull{
+      width: 100vw;
+      height: 100vh;
+      position:relative;
+      background: #FFD966;
+      overflow:hidden;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+    }
+    .selectFullImg{
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display:block;
+      user-select:none;
+      -webkit-user-drag:none;
+    }
+    .selectHotspot{
+      position:absolute;
+      border:0;
+      background: transparent;
+      cursor:pointer;
+      border-radius: 28px;
+    }
+    /* 整页点击开始（如需精确热区再微调） */
+    #hotMath{
+      left: 9%;
+      top: 26%;
+      width: 38%;
+      height: 54%;
+    }
+    #hotSelectBack{ display:none; }
+    #hotHanzi{ display:none; }
+
+    /* ====== 便利店场景页：整图自适应（替代原算数游戏） ====== */
+    .device.page-hanziGame .footerAI{
+      display:none;
+    }
+    .device.page-mathHW .footerAI{
+      display:none;
+    }
+    .device.page-hanziGame .content{
+      max-width: none;
+      margin: 0;
+      min-height: 100vh;
+      padding: 0;
+    }
+    /* 仅第三页「扫码阶段」：!important 压过 .storeHwBtn / .keypadKey 等 cursor:pointer */
+    .device.page-hanziGame.cursor-scan,
+    .device.page-hanziGame.cursor-scan *{
+      cursor: url("assets/扫码枪.png") 0 0, auto !important;
+    }
+    .device.page-hanziGame{
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      min-height: 100vh;
+      border-radius: 0;
+    }
+    .device.page-hanziGame #page-hanziGame.page.active{
+      display:block;
+      min-height: 100vh;
+    }
+    /* 第四页（算术作业）全页背景：使用 assets/背景.png */
+    .device.page-mathHW{
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      min-height: 100vh;
+      border-radius: 0;
+    }
+    .device.page-mathHW .content{
+      max-width: none;
+      margin: 0;
+      min-height: 100vh;
+      padding: 0 0 calc(var(--footer-h) + 26px) 0;
+    }
+    .device.page-mathHW #page-mathHW.page.active{
+      display:block;
+      min-height: 100vh;
+      padding: 14px 18px 0 18px;
+      background: url("assets/背景.png") center / cover no-repeat;
+      position: relative;
+    }
+    .device.page-mathHW #mathBgOverlay{
+      position:absolute;
+      inset:0;
+      background:url("assets/背景3.png") center / cover no-repeat;
+      opacity:0;
+      transition: opacity 300ms ease;
+      pointer-events:none;
+      z-index: 0; /* 在背景之上 */
+    }
+    .device.page-mathHW #mathDistractionBubble{
+      position: absolute;
+      left: 336px;
+      top: 100px;
+      width: 320px;
+      height: auto;
+      z-index: 25; /* 跟随背景3出现，显示在内容层上方 */
+      display: none;
+      pointer-events: none;
+      user-select: none;
+      -webkit-user-drag: none;
+    }
+    .device.page-mathHW #mathDistractionBubbleText{
+      position: absolute;
+      left: 388px;
+      top: 178px;
+      width: 210px;
+      min-height: 86px;
+      z-index: 26;
+      display: none;
+      pointer-events: none;
+      color: #48290D;
+      font-size: calc(24px * var(--ui-scale));
+      font-weight: 1100;
+      line-height: 1.25;
+      text-align: center;
+      white-space: normal;
+      word-break: break-all;
+    }
+    /* 第四页：只抬起内容容器，避免覆盖绝对定位元素（计时/摄像头） */
+    .device.page-mathHW #page-mathHW .hwHeader{
+      position: relative;
+      z-index: 20001; /* 让计时容器整体压过电子闹钟层 */
+    }
+    .device.page-mathHW #page-mathHW .hwStage{
+      position: relative;
+      z-index: 2;
+    }
+    .device.page-mathHW .mathAlarmImg,
+    .device.page-hanziHW .mathAlarmImg{
+      position: absolute;
+      /* 以台灯位置为锚点，向右 10px */
+      left: calc(62% - 520px);
+      top: 678px;
+      width: 230px;
+      height: auto;
+      z-index: 20;
+      pointer-events: none;
+      user-select: none;
+      -webkit-user-drag: none;
+    }
+    .device.page-mathHW #timer2{
+      position: fixed;
+      /* 放在电子闹钟范围内（并保持在其前面） */
+      left: calc(62% - 470px);
+      top: 719px;
+      font-size: calc(46px * var(--ui-scale));
+      color: #48290D;
+      background: transparent;
+      border: 0;
+      box-shadow: none;
+      z-index: 20000 !important; /* 强制在电子闹钟前面 */
+      display: block;
+      opacity: 1;
+      visibility: visible;
+      text-shadow: 0 1px 0 rgba(255,255,255,.25);
+      pointer-events: none;
+      white-space: nowrap;
+    }
+    /* 再次明确层级关系：计时始终高于电子闹钟 */
+    .device.page-mathHW #page-mathHW .mathAlarmImg{
+      z-index: 20 !important;
+    }
+    .device.page-mathHW #page-mathHW #timer2{
+      z-index: 20000 !important;
+    }
+    /* 第四页摄像头区域：去标题/状态、画面缩小200px、去白色面板 */
+    /* 必须给容器明确宽度，否则子元素 width:100% 会塌成 0，只剩 #111 黑底看起来像黑屏 */
+    .device.page-mathHW #focusPanelMath{
+      background: transparent;
+      border: 0;
+      box-shadow: none;
+      padding: 0;
+      position: absolute;
+      right: 20px;
+      top: 20px;
+      width: min(280px, calc(100vw - 40px));
+      max-width: 92vw;
+      z-index: 30;
+    }
+    .device.page-mathHW #focusPanelMath .focusPanelTitle,
+    .device.page-mathHW #focusPanelMath .focusStatus{
+      display: none;
+    }
+    .device.page-mathHW #focusPanelMath .focusPreviewWrap{
+      width: 100%;
+      margin-left: 0;
+      margin-top: 0;
+    }
+    .storeFull{
+      width: 100vw;
+      height: 100vh;
+      position: relative;
+      background: #FFD966;
+      overflow: hidden;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+    }
+    .storeFullImg{
+      width: 100%;
+      height: 100%;
+      object-fit: cover; /* 铺满网页，覆盖两侧黄条 */
+      object-position: center;
+      display:block;
+      user-select:none;
+      -webkit-user-drag:none;
+    }
+    .storeFrameImg{
+      position:absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center;
+      z-index: 1;
+      pointer-events:none;
+      user-select:none;
+      -webkit-user-drag:none;
+    }
+    .storeBearBase{
+      position:absolute;
+      left: 0;
+      top: 0;
+      width: 0;
+      height: 0;
+      object-fit: contain;
+      z-index: 1; /* 原小熊底层 */
+      display:none; /* 由 JS 在第三页渲染时启用 */
+      pointer-events:none;
+      user-select:none;
+      -webkit-user-drag:none;
+    }
+    .storeBasketBase{
+      position:absolute;
+      left: 0;
+      top: 0;
+      width: 0;
+      height: 0;
+      object-fit: contain;
+      z-index: 4; /* 在小熊上层、零食图标下层 */
+      display:none; /* 由 JS 同步到刷新区域 */
+      pointer-events:none;
+      user-select:none;
+      -webkit-user-drag:none;
+    }
+    .storeBubbleFrame{
+      position:absolute;
+      left: 0;
+      top: 0;
+      width: 0;
+      height: 0;
+      object-fit: contain;
+      z-index: 3; /* 在小熊上层、购物筐下层 */
+      display:none; /* 由 JS 进入第三页时定位显示 */
+      pointer-events:none;
+      user-select:none;
+      -webkit-user-drag:none;
+    }
+    .storeBubbleToast{
+      position:absolute;
+      left: 0;
+      top: 0;
+      width: 0;
+      height: 0;
+      z-index: 6; /* 在气泡框上方 */
+      display:none;
+      align-items:center;
+      justify-content:center;
+      pointer-events:none;
+      color: #48290D;
+      font-weight: 1200;
+      text-align: center;
+      white-space: normal;
+      word-break: break-all;
+      overflow: hidden; /* 保证反馈只在气泡框范围内 */
+      background: transparent; /* 去掉白色椭圆 */
+      border: 0;
+      box-shadow: none;
+      font-size: 34px; /* 初始字号，JS 会自动适配 */
+      line-height: 1.2;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    .snackBasket{
+      position:absolute;
+      left: 0;
+      top: 0;
+      width: 40%;
+      height: 18%;
+      display:flex;
+      gap: 0; /* 间距由 JS 精确控制 */
+      align-items:flex-end;
+      justify-content:flex-start;
+      overflow:visible; /* 显示完整旋转后的零食 */
+      pointer-events:auto; /* 允许点击零食 */
+      z-index: 5; /* 保证篮筐始终在小熊表情层前面 */
+    }
+    .snackBasket img{
+      height: auto;
+      max-height: 100%;
+      flex: 0 0 auto; /* 宽度由 JS 控制，保证间距准确 */
+      object-fit: contain;
+      display:block;
+      filter: drop-shadow(0 10px 14px rgba(0,0,0,.10));
+      transform-origin: center center;
+      will-change: transform;
+      transition: transform 260ms cubic-bezier(.2,.9,.2,1), opacity 220ms ease;
+      pointer-events:auto;
+    }
+
+    /* 第三页：作业展示按钮（打开真实摄像头检测纸张） */
+    .storeHwBtn{
+      position:absolute;
+      right: 26px;
+      top: 22px;
+      z-index: 60;
+      width: 180px;
+      height: 64px;
+      border: 0;
+      border-radius: 18px;
+      background: rgba(255,255,255,.86);
+      box-shadow: 0 14px 30px rgba(0,0,0,.14);
+      font-size: 26px;
+      font-weight: 1200;
+      color: #48290D;
+      cursor: pointer;
+      display: none; /* 默认隐藏，避免在非第三页误显示 */
+    }
+    .storeHwBtn:active{ transform: translateY(1px); }
+    .device.page-hanziGame .storeHwBtn{
+      display: block; /* 仅第三页显示 */
+    }
+    .device.page-select .storeHwBtn,
+    .device.page-select #btnShowStoreHW{
+      display: none !important; /* 第二页彻底去掉“作业展示” */
+    }
+
+    /* priceLayer：把 natural 像素坐标系对齐到当前 object-fit: cover 的屏幕坐标 */
+    .priceLayer{
+      position:absolute;
+      left: 0;
+      top: 0;
+      width: 14187px;  /* JS 会覆盖成实际 natural 尺寸 */
+      height: 8119px;  /* JS 会覆盖成实际 natural 尺寸 */
+      transform-origin: top left;
+      pointer-events:none;
+      z-index: 9;
+    }
+
+    /* 键盘叠加层：与 priceLayer 同步 transform（natural 像素坐标系对齐） */
+    .keypadLayer{
+      position:absolute;
+      left: 0;
+      top: 0;
+      width: 14187px;
+      height: 8119px;
+      transform-origin: top left;
+      z-index: 12;
+      pointer-events:none; /* 只让键位按钮命中，避免挡住零食点击 */
+    }
+    .keypadKey{
+      position:absolute;
+      border:0;
+      background: transparent;
+      padding:0;
+      margin:0;
+      opacity: 0; /* 完全透明但可点击 */
+      cursor:pointer;
+      pointer-events:auto;
+      color: transparent;
+    }
+    .keypadKey:disabled{
+      pointer-events:none;
+      cursor: default;
+    }
+
+    /* 收银机显示框：用于显示“加法算式”，严格裁剪在框内 */
+    .priceDisplayBox{
+      position:absolute;
+      /* ====== 显示框精准像素坐标（基于 natural 图 14187x8119） ====== */
+      left: 8500px;
+      top: 4200px;
+      width: 4300px;
+      height: 1600px;
+      padding: 0;
+      border-radius: 20px;
+      background-color: transparent; /* 移除额外黑色长方形，仅保留文字与裁剪 */
+      box-shadow: none;
+      border: 0;
+      color: #48290D;
+      font-weight: 1200;
+      /* 放大到原来的 8 倍（48px * 8 = 384px），实际会在 fitSnackExpressionText 中按框内宽度自动缩小 */
+      font-size: 384px;
+      line-height: 1;
+      text-align:center;
+      z-index: 10;
+      pointer-events:none;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      white-space: nowrap;
+      overflow:hidden; /* 严格限制文字只在键盘框内显示 */
+      box-sizing: border-box;
+      font-family: var(--font);
+    }
+    .scannedListPanel{
+      position:absolute;
+      left: 12250px;
+      top: 4550px;
+      width: 1500px;
+      max-height: 2350px;
+      padding: 18px 16px 14px;
+      border-radius: 18px;
+      background: rgba(255,255,255,.82);
+      border: 1px solid rgba(72,41,13,.18);
+      box-shadow: 0 10px 20px rgba(0,0,0,.10);
+      box-sizing: border-box;
+      z-index: 10;
+      pointer-events:none;
+      overflow:hidden;
+    }
+    .scannedListTitle{
+      font-size: 86px;
+      line-height: 1;
+      font-weight: 1200;
+      color: #48290D;
+      margin-bottom: 30px;
+      white-space: nowrap;
+      text-align: center;
+    }
+    .scannedListBody{
+      display:flex;
+      flex-direction:column;
+      gap: 20px;
+      padding-top: 50px;
+      max-height: 2080px;
+      overflow:hidden;
+    }
+    .scannedItem{
+      display:flex;
+      align-items:center;
+      gap: 12px;
+      min-height: 190px;
+      padding-left: 40px;
+    }
+    .scannedItem img{
+      width: 180px;
+      height: 180px;
+      object-fit: contain;
+      border-radius: 12px;
+      background: rgba(255,255,255,.75);
+      border: 1px solid rgba(0,0,0,.08);
+      flex: 0 0 auto;
+    }
+    .scannedItemPrice{
+      font-size: 74px;
+      line-height: 1;
+      font-weight: 1200;
+      color: #48290D;
+      white-space: nowrap;
+      margin-left: 340px;
+    }
+
+    /* 第三页：用外置小熊表情图覆盖背景小熊 */
+    .storeBearMood{
+      position:absolute;
+      left: 0;
+      top: 0;
+      width: 0;
+      height: 0;
+      object-fit: contain;
+      /* 覆盖原小熊，但位于购物筐下层 */
+      z-index: 2;
+      display:none;
+      pointer-events:none;
+      user-select:none;
+      -webkit-user-drag:none;
+      filter: drop-shadow(0 10px 16px rgba(0,0,0,.10));
+    }
+    @media (max-width: 700px){
+      /* 小屏基于 36px -> 8 倍 */
+      .priceDisplayBox{ font-size: 288px; }
+    }
+
+    @keyframes jiafaPop{
+      0%{ transform: translate(-50%, 0) scale(.95); opacity: 0; }
+      15%{ opacity: 1; }
+      100%{ transform: translate(-50%, -18px) scale(1.05); opacity: 0; }
+    }
+    .snackJiaFaPop{
+      position:absolute;
+      z-index: 7;
+      font-weight: 1200;
+      font-size: 34px;
+      color: #FFD966;
+      pointer-events:none;
+      transform: translate(-50%, 0);
+      animation: jiafaPop 700ms ease forwards;
+      text-shadow: 0 2px 0 rgba(0,0,0,.25);
+    }
+
+    .storeCompleteBtn{
+      position:absolute;
+      left: 50%;
+      bottom: 9%;
+      transform: translateX(-50%);
+      z-index: 5;
+      width: min(520px, 86vw);
+      height: 96px;
+      padding: 0;
+      border-radius: 30px;
+      background: #FDEEB4;
+      border: 8px solid rgba(160,110,65,.35);
+      box-shadow: 0 18px 40px rgba(0,0,0,.14);
+      font-size: 46px;
+      font-weight: 1200;
+      color: rgba(0,0,0,.86);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+    }
+    .storeCompleteBtn:hover{ background: #FDE59E; }
+    .storeCompleteBtn:active{
+      background: #FDE59E;
+      transform: translateX(-50%) translateY(1px) scale(.99);
+    }
+    @media (max-width:520px){
+      .storeCompleteBtn{
+        height: 90px;
+        font-size: 44px;
+        border-width: 7px;
+      }
+    }
+
+    .page{ display:none; min-height: calc(100% - 8px); }
+    .page.active{ display:block; }
+    /* 页面切换动效（主要用于 1->2）：淡入淡出更丝滑 */
+    .page.isLeaving{
+      animation: pageFadeOut 200ms ease forwards;
+    }
+    .page.isEntering{
+      animation: pageFadeIn 240ms ease forwards;
+    }
+    @keyframes pageFadeOut{
+      from{ opacity: 1; }
+      to{ opacity: 0; }
+    }
+    @keyframes pageFadeIn{
+      from{ opacity: 0; }
+      to{ opacity: 1; }
+    }
+
+    /* 通用按钮：大圆角 + 悬停 */
+    .btn{
+      border:0;
+      border-radius: 999px;
+      padding: 14px 18px;
+      font-weight: 1100;
+      font-size: calc(20px * var(--ui-scale));
+      cursor:pointer;
+      background: var(--primary);
+      color: #3b2f1a;
+      box-shadow: 0 12px 26px rgba(0,0,0,.12);
+      transition: transform .08s ease, filter .15s ease, background .15s ease;
+      min-height: 48px;
+    }
+    .btn:hover{ background: var(--primary-deep); filter:saturate(1.05); }
+    .btn:active{ transform: translateY(1px) scale(.99); }
+    .btn:disabled{ opacity:.55; cursor:not-allowed; }
+
+    .topbar{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap: 12px;
+      padding: 6px 2px 12px 2px;
+    }
+    .backBtn{
+      width: 44px;
+      height: 44px;
+      border-radius: 999px;
+      border: 0;
+      background: rgba(255,255,255,.45);
+      cursor:pointer;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-size: calc(22px * var(--ui-scale));
+      transition: background .15s ease, transform .08s ease;
+    }
+    .backBtn:hover{ background: rgba(255,255,255,.62); }
+    .backBtn:active{ transform: translateY(1px) scale(.99); }
+
+    .timerPill{
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.50);
+      border: 1px solid rgba(0,0,0,.06);
+      font-weight: 1100;
+      color: rgba(0,0,0,.62);
+      min-width: 92px;
+      text-align:center;
+      user-select:none;
+      font-size: calc(16px * var(--ui-scale));
+    }
+
+    /* Toast 提示（✅/❌/锁定提示） */
+    .toast{
+      position:fixed;
+      left:50%;
+      top: 12%;
+      transform: translateX(-50%);
+      background: rgba(255,255,255,.96);
+      border: 1px solid rgba(0,0,0,.08);
+      border-radius: 999px;
+      padding: 12px 18px;
+      font-weight: 1100;
+      box-shadow: 0 14px 28px rgba(0,0,0,.12);
+      display:none;
+      z-index: 9998; /* 防止被第三页全屏图片层遮挡 */
+      user-select:none;
+      text-align:center;
+      max-width: 92%;
+    }
+    .toast.show{ display:block; animation: pop .18s ease; }
+    @keyframes pop{
+      from{ transform: translateX(-50%) scale(.96); opacity:.4; }
+      to{ transform: translateX(-50%) scale(1); opacity:1; }
+    }
+
+    /* ====== 初始页（参考图：标题 + click按钮） ====== */
+    /* 初始页/选择页：直接用你提供的图片，不改动图片内容 */
+    .imgPage{
+      /* 防止把 1024px 原图放大导致模糊 */
+      max-width: min(1024px, 100%);
+      margin: 0 auto;
+      border-radius: 34px;
+      overflow:hidden;
+      /* 3D质感：多层阴影 + 高光边 + 轻微“抬起” */
+      box-shadow:
+        0 10px 0 rgba(255,255,255,.35) inset,
+        0 2px 0 rgba(0,0,0,.04) inset,
+        0 30px 90px rgba(0,0,0,.16),
+        0 10px 24px rgba(0,0,0,.10);
+      border: 1px solid rgba(0,0,0,.08);
+      background: linear-gradient(180deg, rgba(255,255,255,.32), rgba(255,255,255,.18));
+      position:relative;
+      transform: translateY(0);
+      transition: transform .18s ease, box-shadow .18s ease, filter .18s ease;
+    }
+    .imgPage::before{
+      content:"";
+      position:absolute;
+      inset:0;
+      pointer-events:none;
+      /* 统一背景为 #F0CD67：不再叠加任何高光渐变 */
+      display:none;
+    }
+    /* 欢迎页：去掉淡黄色高光（保持原图不叠加效果） */
+    #page-welcome .imgPage::before{
+      display:none;
+    }
+    @media (hover:hover){
+      .imgPage:hover{
+        transform: translateY(-2px);
+        filter: saturate(1.02);
+        box-shadow:
+          0 10px 0 rgba(255,255,255,.38) inset,
+          0 2px 0 rgba(0,0,0,.04) inset,
+          0 40px 110px rgba(0,0,0,.18),
+          0 14px 28px rgba(0,0,0,.12);
+      }
+    }
+    .pageImg{
+      width: 100%;
+      height: auto;
+      display:block;
+      user-select:none;
+      -webkit-user-drag:none;
+      image-rendering: auto;
+    }
+    .hotspot{
+      position:absolute;
+      border:0;
+      background: transparent;
+      cursor:pointer;
+      border-radius: 28px;
+      outline: none;
+      /* 给图片上的“可点击区域”也一点按钮质感（很轻，不改布局） */
+      box-shadow: 0 14px 28px rgba(0,0,0,.12);
+    }
+    .hotspot:focus-visible{
+      box-shadow: 0 0 0 4px rgba(255,217,102,.65);
+    }
+    /* 欢迎页：Click按钮热点（按图片比例大致覆盖） */
+    #hotStart{
+      left: 38%;
+      top: 67%;
+      width: 24%;
+      height: 16%;
+    }
+
+    /* 欢迎页保持原本“元素版”布局样式 */
+    /* 选择页：左/右卡片热点 + 左上返回箭头热点 */
+    #hotSelectBack{
+      left: 3%;
+      top: 4%;
+      width: 10%;
+      height: 18%;
+      border-radius: 18px;
+    }
+    #hotMath{
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+    }
+    #hotHanzi{
+      left: 53%;
+      top: 26%;
+      width: 38%;
+      height: 54%;
+    }
+
+    /* ====== 欢迎页：整图自适应（ThinkBook 16P 等大屏） ====== */
+    .device.page-welcome{
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      min-height: 100vh;
+      border-radius: 0;
+    }
+    .device.page-welcome .content{
+      max-width: none;
+      margin: 0;
+      min-height: 100vh;
+      padding: 0;
+    }
+    .device.page-welcome #page-welcome{
+      min-height: 100vh;
+      display:block;
+    }
+    .welcomeFull{
+      width: 100vw;
+      height: 100vh;
+      position:relative;
+      background: #FFD966;
+      overflow:hidden;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+    }
+    .welcomeFullImg{
+      width: 100%;
+      height: 100%;
+      object-fit: contain; /* 完整显示，不裁切 */
+      display:block;
+      user-select:none;
+      -webkit-user-drag:none;
+    }
+    .welcomeFullClick{
+      position:absolute;
+      inset: 0;
+      border: 0;
+      background: transparent;
+      cursor:pointer;
+    }
+
+    /* ====== 新版第1/2页（参考图布局，非整图） ====== */
+    /* 欢迎页：按参考图坐标摆放（基准 1024x720，按宽度等比缩放） */
+    #page-welcome.page.active{
+      display:flex;
+      align-items:center;
+      justify-content:center;
+    }
+    .heroStageBtn{
+      width: min(1024px, 100%);
+      border:0;
+      background: transparent;
+      padding: 0;
+      cursor:pointer;
+      border-radius: 34px;
+      user-select:none;
+    }
+    .heroStageBtn:focus-visible{
+      outline:none;
+      box-shadow: 0 0 0 6px rgba(255,255,255,.55);
+    }
+    .heroStage{
+      width: 100%;
+      position:relative;
+      border-radius: 34px;
+      overflow:hidden;
+      --hero-scale: 1;
+    }
+    .heroAbs{
+      position:absolute;
+      left:0;
+      top:0;
+      width: 1024px;
+      height: 720px;
+      transform-origin: 0 0;
+      transform: scale(var(--hero-scale));
+    }
+    .heroTitleAbs{
+      position:absolute;
+      left: 213px;
+      top: 248px;
+      font-size: calc(44px * var(--ui-scale));
+      font-weight: 1300;
+      letter-spacing: .6px;
+      color: rgba(60,45,30,.92);
+      text-shadow: 0 4px 0 rgba(0,0,0,.06);
+      white-space: nowrap;
+    }
+    .heroSubAbs{
+      position:absolute;
+      left: 213px;
+      top: 384px;
+      font-size: calc(34px * var(--ui-scale));
+      font-weight: 1200;
+      letter-spacing: .6px;
+      color: rgba(60,45,30,.86);
+      text-shadow: 0 4px 0 rgba(0,0,0,.05);
+      white-space: nowrap;
+    }
+    .heroBearAbs{
+      position:absolute;
+      left: 820px;
+      top: 151px;
+      width: 190px;
+      height: 190px;
+    }
+    .heroBearAbs img{
+      width:100%;
+      height:100%;
+      object-fit: contain;
+      display:block;
+    }
+    .heroClickAbs{
+      position:absolute;
+      left: 459px;
+      top: 555px;
+      width: 320px;
+      height: 104px;
+      border-radius: 34px;
+      background: rgba(255,255,255,.42);
+      border: 6px solid rgba(160,110,65,.55);
+      box-shadow:
+        0 10px 0 rgba(255,255,255,.35) inset,
+        0 26px 60px rgba(0,0,0,.14);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+    }
+    .heroClickAbs span{
+      font-size: calc(48px * var(--ui-scale));
+      font-weight: 1200;
+      letter-spacing: 2px;
+      color: #48290D;
+      text-shadow: 0 3px 0 rgba(255,255,255,.35);
+    }
+
+    /* 第二页：按参考图的“简洁卡片”布局 */
+    .selectWrap{
+      max-width: 1024px;
+      margin: 0 auto;
+      padding: 28px 10px 0 10px;
+      background: transparent;
+      position:relative;
+    }
+    .selectBack{
+      position:absolute;
+      left: 6px;
+      top: 6px;
+      width: 56px;
+      height: 56px;
+      border-radius: 999px;
+      border:0;
+      background: transparent;
+      cursor:pointer;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-size: 44px;
+      color: rgba(0,0,0,.42);
+      transition: transform .08s ease, color .15s ease;
+    }
+    .selectBack:hover{ color: rgba(0,0,0,.58); transform: translateY(-1px); }
+    .selectBack:active{ transform: translateY(1px) scale(.99); }
+
+    .selectCards{
+      margin-top: 110px;
+      display:flex;
+      justify-content:center;
+      gap: 120px;
+      flex-wrap:wrap;
+      padding: 0 18px;
+    }
+    .bigCard{
+      width: 360px;
+      height: auto;
+      background: transparent;
+      border: 0;
+      box-shadow: none;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      justify-content:flex-start;
+      gap: 22px;
+      cursor:pointer;
+      user-select:none;
+      transition: transform .12s ease, filter .15s ease;
+    }
+    .bigCard:hover{ transform: translateY(-2px); filter:saturate(1.03); }
+    .bigCard:active{ transform: translateY(1px) scale(.99); }
+
+    /* 图标下面的淡黄色矩形（参考图） */
+    .cardIcon{
+      width: 280px;
+      height: 280px;
+      border-radius: 44px;
+      background: #FFF6D3;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      box-shadow: none;
+      position:relative;
+    }
+    .opsGrid{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: 1fr 1fr;
+      gap: 34px;
+      font-size: 118px;
+      font-weight: 1200;
+      color: rgba(160,110,65,.95);
+      line-height:1;
+      width: 100%;
+      height: 100%;
+      place-items: center; /* 确保整体在淡黄色矩形正中 */
+    }
+    .opsGrid > div{
+      width: 100%;
+      height: 100%;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+    }
+    .cardLabel{
+      font-size: 46px;
+      font-weight: 1300;
+      letter-spacing: 2px;
+      color: rgba(60,45,30,.88);
+    }
+    .hanziIconImg{
+      width: 86%;
+      height: 86%;
+      object-fit: contain;
+      display:block;
+    }
+
+    /* ====== 游戏选择页（参考图：两个大卡片） ====== */
+    /* 桌面：把游戏内容整体放大一点 */
+    @media (min-width: 900px){
+      .gameTitle{ font-size: calc(36px * var(--ui-scale)); }
+      .stars{ font-size: calc(28px * var(--ui-scale)); }
+      .emojiPic{ width: 170px; height: 170px; font-size: calc(92px * var(--ui-scale)); border-radius: 40px; }
+      .wordBtn{ font-size: calc(26px * var(--ui-scale)); min-height: 66px; }
+      .equation{ font-size: calc(72px * var(--ui-scale)); }
+      .paperInput{ font-size: calc(40px * var(--ui-scale)); min-height: 72px; }
+      .padBtn{ font-size: calc(26px * var(--ui-scale)); min-height: 64px; border-radius: 22px; }
+      .hwTitle{ font-size: calc(32px * var(--ui-scale)); max-width: none; }
+      .timerPill{ font-size: calc(18px * var(--ui-scale)); }
+      .hwStage{ padding: 22px; }
+    }
+    .lockHint{
+      margin-top: 22px;
+      font-weight: 1100;
+      color: rgba(0,0,0,.58);
+      background: rgba(255,255,255,.22);
+      border: 1px solid rgba(0,0,0,.06);
+      border-radius: 24px;
+      padding: 12px 14px;
+      line-height: 1.35;
+      box-shadow: 0 28px 70px rgba(0,0,0,.10);
+    }
+
+    /* ====== 游戏页：标题 + 星星 ====== */
+    .gameHeader{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap: 10px;
+      margin-top: 6px;
+    }
+    .gameTitle{
+      margin:0;
+      font-size: calc(28px * var(--ui-scale));
+      font-weight: 1200;
+      letter-spacing:.6px;
+    }
+    .stars{
+      font-size: calc(22px * var(--ui-scale));
+      letter-spacing: 2px;
+      color: rgba(0,0,0,.35);
+      user-select:none;
+      min-width: 76px;
+      text-align:right;
+    }
+    .stars .on{ color: rgba(0,0,0,.80); }
+    .gameArea{
+      margin-top: 18px;
+      padding: 18px 16px;
+      border-radius: 34px;
+      background: rgba(255,255,255,.22);
+      border: 1px solid rgba(0,0,0,.06);
+      box-shadow: 0 28px 70px rgba(0,0,0,.10);
+    }
+
+    /* 识字：Emoji图片 + 词语按钮 */
+    .emojiPic{
+      width: 120px;
+      height: 120px;
+      margin: 0 auto;
+      border-radius: 30px;
+      background: rgba(255,255,255,.65);
+      border: 1px solid rgba(0,0,0,.06);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-size: calc(66px * var(--ui-scale));
+      box-shadow: 0 14px 26px rgba(0,0,0,.10);
+      user-select:none;
+    }
+    .wordGrid{
+      display:grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+      margin-top: 16px;
+    }
+    .wordBtn{
+      width: 100%;
+      min-height: 54px;
+      border-radius: 999px;
+      border: 1px solid rgba(0,0,0,.10);
+      background: rgba(255,255,255,.72);
+      font-size: calc(20px * var(--ui-scale));
+      font-weight: 1200;
+      cursor:pointer;
+      transition: transform .08s ease, background .15s ease;
+      box-shadow: 0 12px 24px rgba(0,0,0,.12);
+    }
+    .wordBtn:hover{ background: rgba(255,255,255,.86); transform: translateY(-1px); }
+    .wordBtn:active{ transform: translateY(0px) scale(.99); }
+    .wordBtn.correct{ background: rgba(135, 227, 170, .92); }
+    .wordBtn.wrong{ background: rgba(255, 153, 153, .90); }
+    .wordBtn:disabled{ opacity:.55; cursor:not-allowed; }
+    .finishWrap{ margin-top: 16px; display:flex; justify-content:center; }
+
+    /* 识字反馈：放在选项模块下方，避免挡视线 */
+    .hanziFeedback{
+      margin-top: 14px;
+      text-align:center;
+      font-weight: 1200;
+      font-size: calc(28px * var(--ui-scale));
+      letter-spacing: .3px;
+      min-height: 40px;
+      color: rgba(0,0,0,.72);
+      user-select:none;
+    }
+    .hanziFeedback.ok{ color: rgba(20,120,70,.92); }
+    .hanziFeedback.bad{ color: rgba(180,60,60,.92); }
+
+    /* 算术：算式 + 输入区 + 数字键盘 3x4 */
+    .equation{
+      font-size: calc(52px * var(--ui-scale));
+      font-weight: 1200;
+      letter-spacing: 1px;
+      text-align:center;
+      margin: 8px 0 12px 0;
+      user-select:none;
+    }
+    .paperInput{
+      width: 100%;
+      border-radius: 22px;
+      border: 2px dashed rgba(0,0,0,.18);
+      background: rgba(255,255,255,.72);
+      padding: 12px 14px;
+      font-weight: 1200;
+      font-size: calc(30px * var(--ui-scale));
+      text-align:center;
+      letter-spacing: 2px;
+      min-height: 58px;
+    }
+    .pad{
+      display:grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-top: 14px;
+    }
+    .padBtn{
+      min-height: 54px;
+      border-radius: 20px;
+      border: 1px solid rgba(0,0,0,.10);
+      background: rgba(255,255,255,.76);
+      font-weight: 1200;
+      font-size: calc(22px * var(--ui-scale));
+      cursor:pointer;
+      transition: transform .08s ease, background .15s ease;
+      box-shadow: 0 12px 24px rgba(0,0,0,.12);
+    }
+    .padBtn:hover{ background: rgba(255,255,255,.90); transform: translateY(-1px); }
+    .padBtn:active{ transform: translateY(0px) scale(.99); }
+    .padBtn.submit{ background: rgba(135, 227, 170, .92); }
+    .padBtn.back{ background: rgba(255,255,255,.66); }
+
+    /* 算数反馈：放在数字模块下方，避免挡视线 */
+    .mathFeedback{
+      margin-top: 14px;
+      text-align:center;
+      font-weight: 1200;
+      font-size: calc(28px * var(--ui-scale) + 50px);
+      letter-spacing: .3px;
+      min-height: 90px;
+      color: rgba(0,0,0,.72);
+      user-select:none;
+    }
+    .mathFeedback.ok{ color: rgba(20,120,70,.92); }
+    .mathFeedback.bad{ color: rgba(180,60,60,.92); }
+
+    /* 书面作业页：CSS小熊写作业（桌子+铅笔摆动） */
+    .hwHeader{
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap: 12px;
+      margin-top: 6px;
+    }
+    .hwTitle{
+      margin:0;
+      font-size: calc(26px * var(--ui-scale));
+      font-weight: 1200;
+      letter-spacing:.4px;
+      line-height:1.25;
+      max-width: none;
+      white-space: nowrap;  /* “现在开始写识字作业吧！”保持一行 */
+    }
+    /* 作业页：按钮居中，小熊在按钮上方（去掉原“白色矩形/桌子”场景） */
+    .hwStage{
+      margin-top: 14px;
+      padding: 12px 0 0 0;
+      background: transparent;
+      border: 0;
+      box-shadow: none;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+    }
+    .hwCenter{
+      width: 100%;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      justify-content:center;
+      gap: 14px;
+      padding: 26px 0 12px 0;
+    }
+    .camBtn{
+      font-size: calc(26px * var(--ui-scale));
+      padding: 18px 18px;
+      min-height: 84px;
+      border-radius: 30px;
+      width: min(520px, 92%);
+      background: #FDEEB4;
+    }
+    /* 第四页：作业展示按钮（图片版）缩小并下移 */
+    .device.page-mathHW #btnShowHW2.camBtn{
+      width: 210px; /* 黄色方块宽 +30px */
+      height: 60px;
+      min-height: 0;
+      padding: 0;
+      border-radius: 22px;
+      margin-top: 150px;
+      font-size: calc(11px * var(--ui-scale)); /* “作业展示”缩小15px（26->11） */
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transform: translateX(630px);
+      position: relative;
+    }
+    /* 第四页：去掉按钮文字/按钮图片（保留黄色按钮可点击） */
+    .device.page-mathHW #btnShowHW2.camBtn > img{
+      display: none;
+    }
+    /* 第四页：按钮文字图（显示在黄色方块上） */
+    .device.page-mathHW #btnShowHW2.camBtn > img.btnTextImg{
+      display: block;
+      width: calc(100% - 33px);
+      height: calc(100% - 33px);
+      object-fit: contain;
+      margin: 0 auto;
+      transform: translateX(17px);
+      pointer-events: none;
+      user-select: none;
+      -webkit-user-drag: none;
+    }
+    .device.page-mathHW #btnShowHW2.camBtn > .btnCamIcon{
+      position: absolute;
+      left: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: calc(41px * var(--ui-scale)); /* 放大15px */
+      line-height: 1;
+      pointer-events: none;
+      user-select: none;
+    }
+    /* 第四页：按钮图片本身放大 30px（不改变黄色底块高度） */
+    .device.page-mathHW #btnShowHW2.camBtn > img{
+      display:block;
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      object-fit: contain;
+      pointer-events: none;
+      user-select: none;
+      -webkit-user-drag: none;
+    }
+    .hwHint{
+      font-weight: 1100;
+      color: rgba(0,0,0,.58);
+      text-align:center;
+      line-height: 1.45;
+      max-width: 720px;
+      font-size: calc(16px * var(--ui-scale));
+    }
+    .focusPanel{
+      width: min(560px, 92%);
+      padding: 14px;
+      border-radius: 16px;
+      background: rgba(255,255,255,.72);
+      box-shadow: 0 10px 28px rgba(0,0,0,.10);
+      border: 1px solid rgba(0,0,0,.08);
+    }
+    .focusPanelTitle{
+      font-size: calc(18px * var(--ui-scale));
+      font-weight: 1200;
+      margin-bottom: 10px;
+      text-align: left;
+      color: rgba(0,0,0,.82);
+    }
+    .focusPreviewWrap{
+      position: relative;
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      border-radius: 12px;
+      overflow: hidden;
+      background: #111;
+    }
+    .focusVideo, .focusCanvas{
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .focusCanvas{ pointer-events: none; }
+    .focusStatus{
+      margin-top: 10px;
+      font-size: calc(16px * var(--ui-scale));
+      font-weight: 1100;
+      color: rgba(0,0,0,.75);
+    }
+    .bearWriter{
+      position:relative;
+      width: 120px;
+      height: 120px;
+    }
+    .bw-head{
+      position:absolute;
+      inset: 0;
+      border-radius: 999px;
+      background: radial-gradient(circle at 35% 30%, #EBC6A2 0%, #C9905D 58%, #A86B3B 100%);
+      box-shadow: 0 16px 28px rgba(0,0,0,.12);
+    }
+    .bw-ear{
+      width: 34px;
+      height: 34px;
+      border-radius: 999px;
+      background: radial-gradient(circle at 35% 30%, #EBC6A2 0%, #C9905D 60%, #A86B3B 100%);
+      position:absolute;
+      top: -6px;
+      box-shadow: 0 14px 20px rgba(0,0,0,.10);
+    }
+    .bw-ear.left{ left: 8px; }
+    .bw-ear.right{ right: 8px; }
+    .bw-face{
+      position:absolute;
+      inset:0;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-size: 44px;
+      filter: drop-shadow(0 2px 0 rgba(255,255,255,.35));
+      transform: translateY(2px);
+    }
+    .pencil{
+      position:absolute;
+      right: -6px;
+      bottom: 22px;
+      width: 66px;
+      height: 16px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, #FFE082 0%, #FFD966 55%, #F7C948 100%);
+      transform-origin: 12px 50%;
+      animation: pencilWiggle 1.0s ease-in-out infinite;
+      box-shadow: 0 12px 18px rgba(0,0,0,.12);
+    }
+    .pencil::before{
+      content:"";
+      position:absolute;
+      left:-12px;
+      top: 0;
+      width: 16px;
+      height: 16px;
+      border-radius: 999px;
+      background: #FF8A80;
+    }
+    .pencil::after{
+      content:"";
+      position:absolute;
+      right:-10px;
+      top: 0;
+      width: 0;
+      height: 0;
+      border-top: 8px solid transparent;
+      border-bottom: 8px solid transparent;
+      border-left: 12px solid #7A5A3A;
+    }
+    /* 按需求：-5deg 到 5deg 的小角度摆动 */
+    @keyframes pencilWiggle{
+      0%{ transform: rotate(-5deg) translateY(0); }
+      50%{ transform: rotate(5deg) translateY(-1px); }
+      100%{ transform: rotate(-5deg) translateY(0); }
+    }
+
+    /* 摄像头模拟模态框 */
+    .modalMask{
+      position:fixed;
+      inset:0;
+      background: rgba(0,0,0,.45);
+      display:none;
+      align-items:center;
+      justify-content:center;
+      z-index: 80;
+      padding: 24px;
+    }
+    .modalMask.show{ display:flex; }
+    .modal{
+      width: min(720px, 92vw);
+      border-radius: 28px;
+      background: rgba(255,255,255,.96);
+      border: 1px solid rgba(0,0,0,.10);
+      box-shadow: 0 26px 70px rgba(0,0,0,.22);
+      padding: 18px 18px 16px 18px;
+    }
+    .modalTitle{
+      margin: 4px 0 14px 0;
+      font-size: calc(22px * var(--ui-scale));
+      font-weight: 1200;
+      text-align:center;
+    }
+    .preview{
+      height: 300px;
+      border-radius: 22px;
+      border: 2px dashed rgba(0,0,0,.16);
+      background: linear-gradient(180deg, rgba(0,0,0,.06), rgba(0,0,0,.03));
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      position:relative;
+      overflow:hidden;
+      user-select:none;
+    }
+    .recDot{
+      position:absolute;
+      left: 14px;
+      top: 12px;
+      display:flex;
+      align-items:center;
+      gap: 8px;
+      font-weight: 1100;
+      color: rgba(0,0,0,.55);
+      background: rgba(255,255,255,.65);
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(0,0,0,.08);
+    }
+    .recDot::before{
+      content:"";
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      background: #ff4d4f;
+      box-shadow: 0 0 0 0 rgba(255,77,79,.55);
+      animation: pulse 1.2s ease-in-out infinite;
+    }
+    @keyframes pulse{
+      0%{ box-shadow: 0 0 0 0 rgba(255,77,79,.0); }
+      50%{ box-shadow: 0 0 0 8px rgba(255,77,79,.22); }
+      100%{ box-shadow: 0 0 0 0 rgba(255,77,79,.0); }
+    }
+    .previewInner{
+      text-align:center;
+      color: rgba(0,0,0,.55);
+      font-weight: 1100;
+    }
+    .previewIcon{ font-size: calc(64px * var(--ui-scale)); }
+    .loadingRow{
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      gap: 10px;
+      margin-top: 8px;
+      color: rgba(0,0,0,.62);
+      font-weight: 1100;
+    }
+    .spinner{
+      width: 18px;
+      height: 18px;
+      border-radius: 999px;
+      border: 3px solid rgba(0,0,0,.18);
+      border-top-color: rgba(0,0,0,.55);
+      animation: spin .8s linear infinite;
+    }
+    @keyframes spin{ to{ transform: rotate(360deg); } }
+    .modalBtns{
+      display:flex;
+      gap: 12px;
+      justify-content:center;
+      margin-top: 14px;
+    }
+    .btnLight{
+      background: rgba(0,0,0,.06);
+      box-shadow:none;
+      color: rgba(0,0,0,.80);
+    }
+    .btnLight:hover{ background: rgba(0,0,0,.09); }
+
+    /* 总结页 */
+    .summaryCard{
+      margin-top: 14px;
+      padding: 18px 16px;
+      border-radius: 34px;
+      background: rgba(255,255,255,.22);
+      border: 1px solid rgba(0,0,0,.06);
+      box-shadow: 0 28px 70px rgba(0,0,0,.10);
+    }
+    .summaryTitle{
+      margin: 10px 0 10px 0;
+      font-size: calc(28px * var(--ui-scale));
+      font-weight: 1200;
+      letter-spacing:.6px;
+      text-align:center;
+      text-shadow: 0 3px 0 rgba(0,0,0,.06);
+    }
+    .summaryText{
+      margin:0;
+      color: rgba(0,0,0,.70);
+      font-weight: 1100;
+      line-height: 1.55;
+      text-align:center;
+      font-size: calc(16px * var(--ui-scale));
+    }
+
+    /* 底部固定AI区：CSS小熊 + 对话框 + 情绪按钮 */
+    .footerAI{
+      position:fixed;
+      left: 50%;
+      transform: translateX(-50%);
+      bottom: 18px;
+      width: min(1000px, calc(100% - 44px));
+      height: calc(var(--footer-h) + var(--safe-bottom));
+      padding: 12px 12px calc(12px + var(--safe-bottom)) 12px;
+      background: rgba(255,255,255,.78);
+      backdrop-filter: blur(10px);
+      border-top: 1px solid rgba(0,0,0,.06);
+      display:flex;
+      gap: 10px;
+      align-items:center;
+      border-radius: 26px;
+      box-shadow: 0 22px 60px rgba(0,0,0,.18);
+    }
+    .miniBear{
+      width: 70px;
+      height: 70px;
+      position:relative;
+      flex: 0 0 70px;
+    }
+    .mb-head{
+      position:absolute;
+      inset:0;
+      border-radius: 999px;
+      background: radial-gradient(circle at 35% 30%, #EBC6A2 0%, #C9905D 58%, #A86B3B 100%);
+      box-shadow: 0 12px 22px rgba(0,0,0,.12);
+    }
+    .mb-ear{
+      width: 24px;
+      height: 24px;
+      border-radius: 999px;
+      background: radial-gradient(circle at 35% 30%, #EBC6A2 0%, #C9905D 60%, #A86B3B 100%);
+      position:absolute;
+      top: -6px;
+      box-shadow: 0 10px 16px rgba(0,0,0,.10);
+    }
+    .mb-ear.left{ left: 6px; }
+    .mb-ear.right{ right: 6px; }
+    .mb-eyes{
+      position:absolute;
+      left: 50%;
+      top: 52%;
+      transform: translate(-50%,-50%);
+      width: 44px;
+      height: 20px;
+    }
+    .mb-eye{
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      background: rgba(0,0,0,.75);
+      position:absolute;
+      top: 2px;
+    }
+    .mb-eye.left{ left: 6px; }
+    .mb-eye.right{ right: 6px; }
+    .mb-nose{
+      position:absolute;
+      left:50%;
+      top: 62%;
+      transform: translateX(-50%);
+      width: 12px;
+      height: 10px;
+      border-radius: 999px;
+      background: rgba(0,0,0,.55);
+    }
+    .mb-name{
+      position:absolute;
+      left:50%;
+      top: 78px;
+      transform: translateX(-50%);
+      font-size: 12px;
+      font-weight: 1100;
+      color: rgba(0,0,0,.55);
+      user-select:none;
+    }
+
+    .bubble{
+      flex: 1;
+      background: rgba(255,255,255,.95);
+      border: 1px solid rgba(0,0,0,.08);
+      border-radius: 24px;
+      padding: 10px 12px;
+      box-shadow: 0 16px 30px rgba(0,0,0,.10);
+      position:relative;
+      min-height: 70px;
+      display:flex;
+      flex-direction:column;
+      justify-content:center;
+      gap: 6px;
+    }
+    .bubble::before{
+      content:"";
+      position:absolute;
+      left: -8px;
+      bottom: 22px;
+      width: 16px;
+      height: 16px;
+      background: rgba(255,255,255,.95);
+      border-left: 1px solid rgba(0,0,0,.08);
+      border-bottom: 1px solid rgba(0,0,0,.08);
+      transform: rotate(45deg);
+    }
+    .bubbleTitle{
+      font-size: calc(12px * var(--ui-scale));
+      font-weight: 1100;
+      color: rgba(0,0,0,.50);
+      letter-spacing:.4px;
+    }
+    .bubbleText{
+      font-size: calc(15px * var(--ui-scale));
+      font-weight: 1100;
+      line-height: 1.28;
+    }
+    .moods{
+      display:flex;
+      flex-direction:column;
+      gap: 8px;
+      flex: 0 0 auto;
+    }
+    .moodBtn{
+      width: 42px;
+      height: 34px;
+      border-radius: 999px;
+      border: 1px solid rgba(0,0,0,.10);
+      background: rgba(0,0,0,.12);
+      cursor:pointer;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-size: calc(18px * var(--ui-scale));
+      transition: background .15s ease, transform .08s ease;
+    }
+    .moodBtn:hover{ background: rgba(0,0,0,.18); }
+    .moodBtn:active{ transform: translateY(1px) scale(.99); }
+
+    /* 作业页：底部小熊替换为 assets/写作业的小熊.png */
+    .device.page-hanziHW .miniBear,
+    .device.page-mathHW .miniBear{
+      width: 130px;
+      height: 130px;
+      border-radius: 0;
+      background: url("assets/写作业的小熊.png") center / contain no-repeat;
+      box-shadow: none;
+      overflow: visible;
+    }
+    .device.page-hanziHW .miniBear > *,
+    .device.page-mathHW .miniBear > *{
+      display: none !important;
+    }
+
+    /* 首页 Click 文字颜色强制覆盖（防止被历史样式覆盖） */
+    #page-welcome .welcomeClickBtn span,
+    #page-welcome .heroClickAbs span,
+    #page-welcome #hotStart{
+      color: #48290D !important;
+    }
+  </style>
+</head>
+<body>
+  <div class="device" role="application" aria-label="儿童学习陪伴AI交互网页原型">
+    <div id="toast" class="toast" aria-live="polite">提示</div>
+
+    <div class="content">
+      <!-- 1) 初始页 -->
+      <section id="page-welcome" class="page active" data-default-bubble="嗨，我们一起开始今天的探险吧！">
+        <div class="welcomeFull" aria-label="欢迎页">
+          <img class="welcomeFullImg" src="assets/welcome.png?v=20260324" alt="欢迎页" />
+          <button class="welcomeFullClick" id="hotStart" type="button" aria-label="开始"></button>
+        </div>
+      </section>
+
+      <!-- 2) 游戏选择页 -->
+      <section id="page-select" class="page" data-default-bubble="点击开始游戏吧！">
+        <div class="selectFull" aria-label="开始游戏页">
+          <img class="selectFullImg" src="assets/开始游戏.png" alt="开始游戏" />
+          <button class="selectHotspot" id="hotMath" type="button" aria-label="开始"></button>
+        </div>
+      </section>
+
+      <!-- 3) 便利店场景页 -->
+      <section id="page-hanziGame" class="page" data-default-bubble="去便利店结账吧！">
+        <div class="storeFull" id="storeStage" aria-label="便利店场景">
+          <!-- 场景拆层：便利店底图 + 购物框 + 小熊 -->
+          <img class="storeFullImg" id="storeBg" src="assets/便利店.png" alt="便利店" />
+          <img class="storeFrameImg" id="storeFrameImg" src="assets/购物框.png" alt="购物框"
+               onerror="this.style.display='none';" />
+          <img class="storeBearBase" id="storeBearBase" src="assets/小熊.png" alt="小熊"
+               onerror="this.style.display='none';" />
+          <img class="storeBasketBase" id="storeBasketBase" src="assets/购物筐.png" alt="购物筐"
+               onerror="this.src='assets/购物框.png'; this.onerror=null;" />
+          <img class="storeBubbleFrame" id="storeBubbleFrame" src="assets/气泡框.png" alt="气泡框"
+               onerror="this.style.display='none';" />
+          <div id="storeBubbleToast" class="storeBubbleToast" aria-hidden="true"></div>
+          <!-- 对错反馈表情：与小熊底图同位置同尺寸，3秒覆盖 -->
+          <img id="storeBearMood" class="storeBearMood" src="" alt="" aria-hidden="true" />
+          <div id="snackBasket" class="snackBasket" aria-hidden="true"></div>
+          <!-- priceLayer：把 natural 坐标系缩放/平移到当前屏幕（object-fit: cover 对齐） -->
+          <div id="priceLayer" class="priceLayer" aria-hidden="true">
+            <!-- priceDisplayBox：严格按你指定的自然像素坐标 -->
+            <div id="priceDisplayBox" class="priceDisplayBox" aria-live="polite"></div>
+            <!-- 已扫码清单：显示点击零食的缩略图 + 价格 -->
+            <div id="scannedListPanel" class="scannedListPanel" aria-hidden="true">
+              <div class="scannedListTitle">已扫码清单</div>
+              <div id="scannedListBody" class="scannedListBody"></div>
+            </div>
+          </div>
+          <!-- 键盘叠加层（透明按钮热区）：用户点击输入答案 -->
+          <div id="keypadLayer" class="keypadLayer" aria-hidden="true"></div>
+        </div>
+      </section>
+
+      <!-- 4) 识字书面作业页 -->
+      <section id="page-hanziHW" class="page" data-default-bubble="我陪你一起写作业，加油～">
+        <img class="mathAlarmImg" src="assets/电子闹钟.png" alt="电子闹钟" />
+        <div class="hwHeader">
+          <h2 class="hwTitle">现在开始写识字作业吧！</h2>
+          <div class="timerPill" id="timer1">30:00</div>
+        </div>
+
+        <div class="hwStage">
+          <div class="hwCenter">
+            <div class="bearWriter" aria-hidden="true">
+              <img src="assets/homework-bear.png"
+                   alt="小熊写作业"
+                   style="width:100%;height:100%;object-fit:contain;display:block;" />
+            </div>
+            <button class="btn camBtn" id="btnShowHW1">📸 作业展示</button>
+            <div class="hwHint">按下按钮后会模拟拍照与识别，识别成功会自动进入下一步。</div>
+
+            <div class="focusPanel" id="focusPanel">
+              <div class="focusPanelTitle">人脸识别专注检测</div>
+              <div class="focusPreviewWrap">
+                <video id="focusVideo" class="focusVideo" autoplay muted playsinline></video>
+                <canvas id="focusCanvas" class="focusCanvas" aria-hidden="true"></canvas>
+        </div>
+              <div id="focusStatus" class="focusStatus">等待启动摄像头...</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 5) 算术书面作业页 -->
+      <section id="page-mathHW" class="page" data-default-bubble="我陪你一起写作业，加油～">
+        <div id="mathBgOverlay" aria-hidden="true"></div>
+        <img id="mathDistractionBubble" src="assets/气泡框1.png" alt="走神提示气泡" aria-hidden="true" />
+        <div id="mathDistractionBubbleText" aria-hidden="true"></div>
+        <img class="mathAlarmImg" src="assets/电子闹钟.png" alt="电子闹钟" />
+        <div class="hwHeader">
+          <h2 class="hwTitle"></h2>
+          <div class="timerPill" id="timer2">30:00</div>
+        </div>
+
+        <div class="hwStage">
+          <div class="hwCenter">
+            <button class="btn camBtn" id="btnShowHW2" aria-label="作业展示">
+              <span class="btnCamIcon" aria-hidden="true">📸</span>
+              <img class="btnTextImg" src="assets/按钮文字.png" alt="" aria-hidden="true" />
+            </button>
+
+            <div class="focusPanel" id="focusPanelMath">
+              <div class="focusPanelTitle">人脸识别专注检测</div>
+              <div class="focusPreviewWrap">
+                <video id="focusVideoMath" class="focusVideo" autoplay muted playsinline></video>
+                <canvas id="focusCanvasMath" class="focusCanvas" aria-hidden="true"></canvas>
+              </div>
+              <div id="focusStatusMath" class="focusStatus">等待启动摄像头...</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 7) 总结页 -->
+      <section id="page-summary" class="page" data-default-bubble="明天见，小英雄！">
+        <div class="summaryFull" aria-label="最后一页">
+          <img class="summaryFullImg" src="assets/最后一页.png" alt="最后一页" />
+          <button class="summaryHotspot" id="btnBackHome" type="button" aria-label="返回首页"></button>
+        </div>
+      </section>
+    </div>
+
+    <!-- 摄像头模拟模态框（两次作业页共用） -->
+    <div class="modalMask" id="camModal" aria-hidden="true">
+      <div class="modal" role="dialog" aria-modal="true" aria-label="摄像头模拟">
+        <div class="modalTitle" id="camTitle">举起你的作业本</div>
+        <div class="preview" id="camPreview" aria-label="模拟摄像头预览">
+          <div class="recDot">录制中</div>
+          <div class="previewInner" id="camPreviewInner">
+            <div class="previewIcon">📷</div>
+            <div>摄像头预览（模拟）</div>
+          </div>
+        </div>
+        <div class="modalBtns">
+          <button class="btn" id="btnCamShot">拍照</button>
+          <button class="btn btnLight" id="btnCamCancel">取消</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 底部固定AI陪伴区 -->
+    <footer class="footerAI" aria-label="AI陪伴区（固定在底部）">
+      <div class="miniBear" aria-hidden="true">
+        <div class="mb-ear left"></div>
+        <div class="mb-ear right"></div>
+        <div class="mb-head"></div>
+        <div class="mb-eyes">
+          <div class="mb-eye left"></div>
+          <div class="mb-eye right"></div>
+        </div>
+        <div class="mb-nose"></div>
+        <div class="mb-name">小暖</div>
+      </div>
+
+      <div class="bubble" role="status" aria-live="polite">
+        <div class="bubbleTitle">AI小熊 · 小暖</div>
+        <div id="bubbleText" class="bubbleText">嗨，我们一起开始今天的探险吧！</div>
+      </div>
+
+      <div class="moods" aria-label="专注力模拟按钮">
+        <button class="moodBtn" data-mood="happy" title="开心">😊</button>
+        <button class="moodBtn" data-mood="tired" title="累了">😴</button>
+        <button class="moodBtn" data-mood="distracted" title="走神">🤔</button>
+      </div>
+    </footer>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+  <script>
+    /***********************
+     * 页面切换与路径锁定
+     ***********************/
+    const pages = {
+      welcome: document.getElementById("page-welcome"),
+      select: document.getElementById("page-select"),
+      hanziGame: document.getElementById("page-hanziGame"),
+      hanziHW: document.getElementById("page-hanziHW"),
+      mathHW: document.getElementById("page-mathHW"),
+      summary: document.getElementById("page-summary"),
+    };
+
+    const toastEl = document.getElementById("toast");
+    const bubbleTextEl = document.getElementById("bubbleText");
+    const deviceEl = document.querySelector(".device");
+
+    let currentPageKey = "welcome";
+    let pathLocked = false; // 选择任一任务后锁定，直到总结页返回首页
+    let flow = [];          // 本次学习路径（根据选择：先识字 or 先算数）
+
+    function setBubble(text){
+      bubbleTextEl.textContent = text;
+    }
+
+    function setDefaultBubble(pageKey){
+      const el = pages[pageKey];
+      const msg = el?.dataset?.defaultBubble || "我在这里陪你～";
+      setBubble(msg);
+    }
+
+    function showToast(text){
+      toastEl.textContent = text;
+      toastEl.classList.add("show");
+      window.clearTimeout(showToast._t);
+      showToast._t = window.setTimeout(() => toastEl.classList.remove("show"), 1100);
+    }
+
+    // 在指定页面元素上方显示 toast（用于第三页收银机附近的提示）
+    function showToastNearRect(text, rect){
+      if (!toastEl || !rect) return showToast(text);
+      const centerX = rect.left + rect.width / 2;
+      const topY = rect.top - 54; // toast 默认高度略高于圆角框
+      toastEl.style.left = centerX + "px";
+      toastEl.style.top = topY + "px";
+      toastEl.style.transform = "translateX(-50%)";
+
+      toastEl.textContent = text;
+      toastEl.classList.add("show");
+      window.clearTimeout(showToast._t);
+      showToast._t = window.setTimeout(() => {
+        toastEl.classList.remove("show");
+        // 恢复默认位置，避免影响其它页面提示
+        toastEl.style.left = "";
+        toastEl.style.top = "";
+        toastEl.style.transform = "";
+      }, 1100);
+    }
+
+    // 本地 file:// 下更稳的 cursor 切换：用绝对 URL + inline style
+    let _scanCursorValue = null;
+    function getScanCursorValue(){
+      if (_scanCursorValue) return _scanCursorValue;
+      const absUrl = new URL("assets/扫码枪.png", location.href).href;
+      // 0 0：热点在图片左上角；如需中心可改成 16 16（取决于图片尺寸）
+      _scanCursorValue = `url("${absUrl}") 0 0, auto`;
+      return _scanCursorValue;
+    }
+    function clearHanziPageCursorStylesBatched(page){
+      if (!page) return;
+      page.style.removeProperty("cursor");
+      const all = page.querySelectorAll("*");
+      const chunk = 100;
+      let i = 0;
+      function step(){
+        const end = Math.min(i + chunk, all.length);
+        for (; i < end; i++){
+          all[i].style.removeProperty("cursor");
+        }
+        if (i < all.length) window.requestAnimationFrame(step);
+      }
+      window.requestAnimationFrame(step);
+    }
+
+    function setScanCursor(enable){
+      const cursorVal = getScanCursorValue();
+      const page = document.getElementById("page-hanziGame");
+      if (deviceEl){
+        deviceEl.classList.toggle("cursor-scan", !!enable);
+      }
+      if (!enable){
+        document.body && document.body.style.removeProperty("cursor");
+        if (page){
+          clearHanziPageCursorStylesBatched(page);
+        }
+        return;
+      }
+      /* 内联 !important：压过 .device.page-hanziGame .storeHwBtn 等高优先级 cursor:pointer */
+      document.body && document.body.style.setProperty("cursor", cursorVal, "important");
+      if (page){
+        page.style.setProperty("cursor", cursorVal, "important");
+        page.querySelectorAll("*").forEach(el => {
+          el.style.setProperty("cursor", cursorVal, "important");
+        });
+      }
+    }
+
+    /***********************
+     * 第四页人脸识别：检测是否走神
+     ***********************/
+    let focusVideoEl = null;
+    let focusCanvasEl = null;
+    let focusStatusEl = null;
+    let focusStream = null;
+    let focusDetectTimer = null;
+    let focusModelsReady = false;
+    let focusMissingFaceSince = 0;
+    let focusLookAwaySince = 0;
+    let focusLookCenterStreak = 0;
+    let focusLookUpSince = 0;
+    let focusYawnSince = 0;
+    let focusLookUpCount = 0;
+    let focusLastTipAt = 0;
+    let focusMoodTimer = null;
+    let focusMoodLastAt = 0;
+    let focusDetectBusy = false;
+    const mathDistractMsgs = [
+      "累了吗？要不要休息一下？",
+      "加加油，很快了",
+      "快结束了呢，你真棒！",
+    ];
+
+    function showMathDistractionBg(msg){
+      const overlay = document.getElementById("mathBgOverlay");
+      const bubble = document.getElementById("mathDistractionBubble");
+      const bubbleText = document.getElementById("mathDistractionBubbleText");
+      if (!overlay) return;
+      overlay.style.opacity = "1";
+      if (bubble) bubble.style.display = "block";
+      if (bubbleText){
+        bubbleText.textContent = msg || "加加油，很快了";
+        bubbleText.style.display = "block";
+      }
+      if (focusMoodTimer) window.clearTimeout(focusMoodTimer);
+      focusMoodTimer = window.setTimeout(() => {
+        overlay.style.opacity = "0";
+        if (bubble) bubble.style.display = "none";
+        if (bubbleText) bubbleText.style.display = "none";
+      }, 3000);
+    }
+
+    function bindFocusDom(pageKey){
+      if (pageKey === "mathHW"){
+        focusVideoEl = document.getElementById("focusVideoMath");
+        focusCanvasEl = document.getElementById("focusCanvasMath");
+        focusStatusEl = document.getElementById("focusStatusMath");
+      } else {
+        focusVideoEl = document.getElementById("focusVideo");
+        focusCanvasEl = document.getElementById("focusCanvas");
+        focusStatusEl = document.getElementById("focusStatus");
+      }
+    }
+
+    async function ensureFocusModels(){
+      if (focusModelsReady) return true;
+      if (!window.faceapi){
+        focusStatusEl && (focusStatusEl.textContent = "face-api.js 加载失败");
+        return false;
+      }
+      const modelUrl = "https://justadudewhohacks.github.io/face-api.js/models";
+      for (let i = 0; i < 3; i++){
+        try{
+          await Promise.all([
+            faceapi.nets.tinyFaceDetector.loadFromUri(modelUrl),
+            faceapi.nets.faceLandmark68TinyNet.loadFromUri(modelUrl),
+            faceapi.nets.faceExpressionNet.loadFromUri(modelUrl),
+          ]);
+          focusModelsReady = true;
+          return true;
+        } catch (e){
+          if (i < 2){
+            focusStatusEl && (focusStatusEl.textContent = "模型加载重试中...");
+            await new Promise(r => window.setTimeout(r, 300));
+            continue;
+          }
+          focusStatusEl && (focusStatusEl.textContent = "模型加载失败，请检查网络");
+          return false;
+        }
+      }
+      return false;
+    }
+
+    async function preloadFocusModelsEarly(){
+      if (focusModelsReady || !window.faceapi) return;
+      const modelUrl = "https://justadudewhohacks.github.io/face-api.js/models";
+      try{
+        await Promise.all([
+          faceapi.nets.tinyFaceDetector.loadFromUri(modelUrl),
+          faceapi.nets.faceLandmark68TinyNet.loadFromUri(modelUrl),
+          faceapi.nets.faceExpressionNet.loadFromUri(modelUrl),
+        ]);
+        focusModelsReady = true;
+      } catch (_e){
+        /* 进入第四页时 ensureFocusModels 会重试 */
+      }
+    }
+
+    function scheduleStartMathHwFocusMonitor(){
+      const run = () => { startFocusMonitor("mathHW"); };
+      window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => {
+          window.setTimeout(run, 100);
+        });
+      });
+    }
+
+    async function startFocusMonitor(pageKey = "hanziHW"){
+      bindFocusDom(pageKey);
+      if (!focusVideoEl || !focusCanvasEl || !focusStatusEl) return;
+      stopFocusMonitor();
+
+      try{
+        focusStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 360 } },
+          audio: false,
+        });
+        focusVideoEl.srcObject = focusStream;
+        try{
+          await focusVideoEl.play();
+        } catch (_e){
+          // 某些浏览器需要用户手势；已是 muted+playsinline，通常可自动播放
+        }
+      } catch (e){
+        focusStatusEl.textContent = "摄像头权限被拒绝或不可用";
+        return;
+      }
+
+      focusStatusEl.textContent = "摄像头已开启，正在加载识别模型...";
+
+      const ok = await ensureFocusModels();
+      if (!ok){
+        // 即便模型失败，也保留视频画面，避免用户看到黑屏
+        focusStatusEl.textContent = "摄像头已开启（模型加载失败，暂无法识别）";
+        return;
+      }
+
+      const runDetect = async () => {
+        if (!focusVideoEl || !focusCanvasEl || focusVideoEl.readyState < 2) return;
+        if (focusDetectBusy) return;
+        focusDetectBusy = true;
+        try {
+
+        const vw = focusVideoEl.videoWidth || 640;
+        const vh = focusVideoEl.videoHeight || 360;
+        if (focusCanvasEl.width !== vw || focusCanvasEl.height !== vh){
+          focusCanvasEl.width = vw;
+          focusCanvasEl.height = vh;
+        }
+
+        const ctx = focusCanvasEl.getContext("2d");
+        if (!ctx) return;
+        ctx.clearRect(0, 0, vw, vh);
+
+        const det = await faceapi
+          .detectSingleFace(
+            focusVideoEl,
+            new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.33 })
+          )
+          .withFaceLandmarks(true)
+          .withFaceExpressions();
+
+        if (!det){
+          if (!focusMissingFaceSince) focusMissingFaceSince = Date.now();
+          const lostMs = Date.now() - focusMissingFaceSince;
+          focusStatusEl.textContent = lostMs > 3500 ? "未检测到人脸，可能走神" : "正在识别人脸...";
+          return;
+        }
+
+        focusMissingFaceSince = 0;
+        const box = det.detection.box;
+        ctx.strokeStyle = "#4BD37B";
+        ctx.lineWidth = 3;
+        ctx.strokeRect(box.x, box.y, box.width, box.height);
+
+        const exp = det.expressions || {};
+        const labels = Object.keys(exp);
+        let topLabel = "neutral";
+        let topScore = -1;
+        labels.forEach(k => {
+          if (exp[k] > topScore){ topScore = exp[k]; topLabel = k; }
+        });
+
+        // 动作识别：
+        // 1) 东张西望：人脸中心长时间偏离画面中央
+        // 2) 打哈欠：嘴巴开合比例持续偏大
+        const cx = box.x + box.width / 2;
+        const centerNorm = cx / Math.max(1, vw);
+        // 东张西望：左右偏移 + 回中防抖（避免单帧抖动把累计时间清掉）
+        const lookingAroundNow = (centerNorm < 0.40 || centerNorm > 0.60);
+        if (lookingAroundNow){
+          focusLookCenterStreak = 0;
+          if (!focusLookAwaySince) focusLookAwaySince = Date.now();
+        } else {
+          focusLookCenterStreak++;
+          // 连续几帧都回到中间才清零
+          if (focusLookCenterStreak >= 3){
+            focusLookAwaySince = 0;
+            focusLookCenterStreak = 0;
+          }
+        }
+
+        // 3) 频繁抬头：人脸中心点长时间位于画面上半区域
+        const cy = box.y + box.height / 2;
+        const centerYNorm = cy / Math.max(1, vh);
+        const lookingUpNow = centerYNorm < 0.38;
+        if (lookingUpNow){
+          if (!focusLookUpSince) focusLookUpSince = Date.now();
+          focusLookUpCount = (focusLookUpCount || 0) + 1;
+        } else {
+          focusLookUpSince = 0;
+          focusLookUpCount = 0;
+        }
+
+        let yawnNow = false;
+        const lm = det.landmarks;
+        if (lm){
+          const mouth = lm.getMouth(); // 20 points
+          if (mouth && mouth.length >= 20){
+            // 打哈欠：用“上唇内侧(13~15)”与“下唇内侧(17~19)”的平均点来估算开口，更稳
+            const pLeft = mouth[0];
+            const pRight = mouth[6];
+            const topAvg = {
+              x: (mouth[13].x + mouth[14].x + mouth[15].x) / 3,
+              y: (mouth[13].y + mouth[14].y + mouth[15].y) / 3,
+            };
+            const botAvg = {
+              x: (mouth[17].x + mouth[18].x + mouth[19].x) / 3,
+              y: (mouth[17].y + mouth[18].y + mouth[19].y) / 3,
+            };
+            const open = Math.hypot(topAvg.x - botAvg.x, topAvg.y - botAvg.y);
+            const width = Math.max(1, Math.hypot(pLeft.x - pRight.x, pLeft.y - pRight.y));
+            const ratio = open / width;
+            // 阈值放宽：更容易触发“打哈欠/大张嘴”
+            yawnNow = ratio > 0.22 || (topLabel === "surprised" && topScore > 0.30);
+          } else {
+            yawnNow = topLabel === "surprised" && topScore > 0.35;
+          }
+        }
+        if (yawnNow){
+          if (!focusYawnSince) focusYawnSince = Date.now();
+        } else {
+          focusYawnSince = 0;
+        }
+
+        const lookingAround = focusLookAwaySince && (Date.now() - focusLookAwaySince > 500);
+        const lookingUpFrequent = (focusLookUpSince && (Date.now() - focusLookUpSince > 1200))
+          || (focusLookUpCount >= 1);
+        const lookingUpOver10s = focusLookUpSince && (Date.now() - focusLookUpSince > 10000);
+        const yawning = focusYawnSince && (Date.now() - focusYawnSince > 220);
+        const distractedByExpression = !["neutral", "happy"].includes(topLabel);
+        const distracted = !!(lookingAround || lookingUpFrequent || yawning || distractedByExpression);
+
+        if (yawning){
+          focusStatusEl.textContent = "可能走神（动作：打哈欠）";
+        } else if (lookingUpOver10s){
+          focusStatusEl.textContent = "可能走神（动作：抬头超过10秒）";
+        } else if (lookingUpFrequent){
+          focusStatusEl.textContent = "可能走神（动作：频繁抬头）";
+        } else if (lookingAround){
+          focusStatusEl.textContent = "可能走神（动作：东张西望）";
+        } else if (distractedByExpression){
+          focusStatusEl.textContent = `可能走神（表情：${topLabel}）`;
+        } else {
+          focusStatusEl.textContent = `专注中（表情：${topLabel}）`;
+        }
+
+        // 走神提示：底部小熊气泡提示，做节流避免刷屏
+        if (distracted){
+          const now = Date.now();
+          if (now - focusLastTipAt > 3500){
+            // “打哈欠/频繁抬头”给明确专注提示
+            if (yawning || lookingUpFrequent || lookingUpOver10s){
+              setBubble("专心写作业");
+            } else {
+              setBubble("累了吗，加加油");
+            }
+            focusLastTipAt = now;
+          }
+        }
+
+        // 第四页：检测到指定动作时，临时切换为“背景3” 3 秒
+        if (pageKey === "mathHW" && (yawning || lookingAround || lookingUpFrequent || lookingUpOver10s)){
+          const now = Date.now();
+          if (now - focusMoodLastAt > 3000){
+            const msg = mathDistractMsgs[Math.floor(Math.random() * mathDistractMsgs.length)];
+            showMathDistractionBg(msg);
+            focusMoodLastAt = now;
+          }
+        }
+        } catch (_err) {
+          focusStatusEl && (focusStatusEl.textContent = "识别波动，正在自动恢复...");
+        } finally {
+          focusDetectBusy = false;
+        }
+      };
+
+      // 比较重的 face-api 检测：用较慢的间隔，避免多次并发导致识别结果不同步
+      runDetect();
+      focusDetectTimer = window.setInterval(() => { runDetect(); }, 600);
+      focusStatusEl.textContent = "人脸识别已启动，正在检测...";
+    }
+
+    function stopFocusMonitor(){
+      if (focusDetectTimer){
+        window.clearInterval(focusDetectTimer);
+        focusDetectTimer = null;
+      }
+      if (focusStream){
+        focusStream.getTracks().forEach(t => t.stop());
+        focusStream = null;
+      }
+      if (focusVideoEl) focusVideoEl.srcObject = null;
+      if (focusCanvasEl){
+        const ctx = focusCanvasEl.getContext("2d");
+        ctx && ctx.clearRect(0, 0, focusCanvasEl.width, focusCanvasEl.height);
+      }
+      focusMissingFaceSince = 0;
+      focusLookAwaySince = 0;
+      focusLookCenterStreak = 0;
+      focusLookUpSince = 0;
+      focusYawnSince = 0;
+      focusLookUpCount = 0;
+      focusMoodLastAt = 0;
+      if (focusMoodTimer){
+        window.clearTimeout(focusMoodTimer);
+        focusMoodTimer = null;
+      }
+      const overlay = document.getElementById("mathBgOverlay");
+      if (overlay) overlay.style.opacity = "0";
+      const bubble = document.getElementById("mathDistractionBubble");
+      if (bubble) bubble.style.display = "none";
+      const bubbleText = document.getElementById("mathDistractionBubbleText");
+      if (bubbleText) bubbleText.style.display = "none";
+    }
+
+    function showPage(key){
+      // 路径锁定：学习中不允许回选择页/首页
+      if (pathLocked && (key === "select" || key === "welcome") && currentPageKey !== "summary"){
+        showToast("先完成学习路径哦～");
+        return;
+      }
+
+      // 离开作业页时清理计时器，避免叠加
+      if (currentPageKey === "hanziHW" || currentPageKey === "mathHW") stopHomeworkTimers();
+      // 离开第四页时关闭摄像头检测
+      if ((currentPageKey === "hanziHW" || currentPageKey === "mathHW")
+        && key !== "hanziHW" && key !== "mathHW") stopFocusMonitor();
+
+      const activatePage = (nextKey) => {
+        const nextPage = pages[nextKey];
+        if (!nextPage) return;
+
+        Object.values(pages).forEach(p => p.classList.remove("active", "isLeaving", "isEntering"));
+        nextPage.classList.add("active", "isEntering");
+        currentPageKey = nextKey;
+        setDefaultBubble(nextKey);
+
+        // 给外层加页面标记，用于欢迎页隐藏底部AI栏等样式
+        if (deviceEl){
+          deviceEl.className = "device page-" + nextKey;
+        }
+        // 仅第三页启用扫码枪光标（离开自动恢复默认）
+        setScanCursor(nextKey === "hanziGame");
+
+        // 进入页面时初始化
+        if (nextKey === "hanziGame"){
+          const bearBase = document.getElementById("storeBearBase");
+          if (bearBase) bearBase.dataset.lockedPos = "";
+          const basketBase = document.getElementById("storeBasketBase");
+          if (basketBase) basketBase.dataset.lockedPos = "";
+          const bubbleFrame = document.getElementById("storeBubbleFrame");
+          if (bubbleFrame) bubbleFrame.style.display = "none";
+          const bubbleToast = document.getElementById("storeBubbleToast");
+          if (bubbleToast) bubbleToast.style.display = "none";
+          storeRoundIndex = 0;
+          storeRoundPlan = null;
+          renderStoreSnacks();
+          if (document.getElementById("hanziOptions")) startHanziGame();
+          window.setTimeout(() => { preloadFocusModelsEarly(); }, 400);
+        }
+        if (nextKey === "hanziHW"){
+          startHomework("hanzi");
+          startFocusMonitor("hanziHW");
+        }
+        if (nextKey === "mathHW"){
+          startHomework("math");
+          stopBgm();
+          if (rainPrewarmed){
+            rainPrewarmed = false;
+            boostRainHomeworkLevel(200, 0.54);
+          } else {
+            playRainLoop();
+          }
+          /* 先让第四页完成布局与绘制，再开摄像头/加载模型，避免 3→4 卡顿 */
+          scheduleStartMathHwFocusMonitor();
+        } else if (nextKey === "summary"){
+          stopRainLoop();
+          fadeInBgm(520);
+        } else {
+          // 非第四页时不保留雨声
+          stopRainLoop();
+          // 第1/2/3/5页播放配乐
+          if (nextKey === "welcome" || nextKey === "select" || nextKey === "hanziGame"){
+            playBgm();
+          } else {
+            stopBgm();
+          }
+        }
+      };
+
+      const prevKey = currentPageKey;
+      const prevPage = pages[prevKey];
+      const nextPage = pages[key];
+
+      if (prevPage && nextPage && prevKey !== key){
+        if (key === "mathHW"){
+          fadeOutBgm(240);
+        }
+        prevPage.classList.add("isLeaving");
+        const delay = key === "mathHW" ? 150 : 180;
+        window.setTimeout(() => { activatePage(key); }, delay);
+        return;
+      }
+
+      if (key === "mathHW"){
+        fadeOutBgm(220);
+        window.setTimeout(() => { activatePage(key); }, 220);
+        return;
+      }
+
+      activatePage(key);
+    }
+
+    function setFlow(){
+      // 新学习路径：便利店结账 -> 算术作业 -> 总结
+      flow = ["hanziGame","mathHW","summary"];
+    }
+
+    function goNext(){
+      const idx = flow.indexOf(currentPageKey);
+      if (idx < 0) return;
+      const next = flow[idx + 1];
+      if (next) showPage(next);
+    }
+
+    /***********************
+     * 第三页随机零食上桌
+     ***********************/
+    const storeSnackPool = [
+      "assets/安慕希.png",
+      "assets/百奇.png",
+      "assets/冰红茶.png",
+      "assets/饼干.png",
+      "assets/大波浪薯片.png",
+      "assets/可比克.png",
+      "assets/乐事.png",
+      "assets/溜溜梅.png",
+      "assets/牛奶.png",
+      "assets/青梅绿茶.png",
+      "assets/软糖.png",
+      "assets/桶装饼干.png",
+      "assets/虾条.png",
+      "assets/椰汁.png",
+    ];
+
+    // 价格映射：文件名 -> 金额
+    const storeSnackPriceMap = {
+      "安慕希.png": 10,
+      "百奇.png": 8,
+      "冰红茶.png": 3,
+      "饼干.png": 6,
+      "大波浪薯片.png": 9,
+      "可比克.png": 7,
+      "乐事.png": 8,
+      "溜溜梅.png": 2,
+      "牛奶.png": 4,
+      "青梅绿茶.png": 5,
+      "软糖.png": 4,
+      "桶装饼干.png": 6,
+      "虾条.png": 7,
+      "椰汁.png": 3,
+    };
+
+    let storeSnackClickedPrices = [];
+
+    // ===== 便利店算数输入（第三页）：点击背景数字热区输入答案 =====
+    let storeEquationReady = false; // "=" 出现后才允许输入
+    let storeEquationExpr = ""; // "5+3+8"
+    let storeAnswer = ""; // "21"
+    let storeExpectedAnswer = null; // 正确答案（= 号前所有零食价格相加）
+    const storeTotalRounds = 4;
+    let storeRoundIndex = 0; // 当前是第几次作答（0-3）
+    // 四轮类型规划：确保“重复(乘法)”与“不重复(加法)”混着出现
+    let storeRoundPlan = null; // e.g. ["mulSub3","add3",...]
+    let storeKeypadButtons = [];
+
+    let cashierAudio = null;
+    let bgmAudio = null;
+    let bgmDuckTimer = null;
+    let bgmFadeTimer = null;
+    const BGM_VOL = 0.13;
+    let rainA = null;
+    let rainB = null;
+    let rainActive = "A";
+    let rainCrossTimer = null;
+    let rainMonitorTimer = null;
+    let rainFadeTimer = null;
+    let rainLoopRunning = false;
+    let rainCrossing = false;
+    let rainPrewarmed = false;
+    let rainBoostTimer = null;
+    // 便利店场景鼓励语库：答对后随机显示
+    const encouragementMessages = [
+      "叮！收款成功，欢迎下次光临～",
+      "顾客说：你算得又快又准，给你点赞！",
+      "收银机开心地‘叮咚’一声：正确！",
+      "店长竖起大拇指：真是最棒的小收银员！",
+      "完美！今天奖励你一张‘算术小能手’优惠券～",
+      "太好了，顾客满意地拿着商品离开了！",
+      "正确！集满三颗星可以换一次抽奖机会哦～",
+      "太厉害了！下一单也拜托你啦！",
+    ];
+    function playCashierDing(opts){
+      opts = opts || {};
+      // 优先播放本地音效文件：assets/收银.mp3
+      try{
+        if (!cashierAudio){
+          const url = new URL("assets/收银.mp3", location.href).href;
+          cashierAudio = new Audio(url);
+          cashierAudio.preload = "auto";
+          cashierAudio.volume = 1.0; // 收银声要明显大于配乐
+        }
+        // 最后一题：由外层同时淡出配乐，这里不再 duck（避免与淡出打架）
+        if (!opts.skipBgmDuck) duckBgmForCashier();
+        cashierAudio.currentTime = 0;
+        const p = cashierAudio.play();
+        if (p && typeof p.catch === "function"){
+          p.catch(() => {
+            // 播放失败时兜底：合成一个短“叮”声
+            playCashierDingSynth();
+          });
+        }
+      } catch (e){
+        playCashierDingSynth();
+      }
+    }
+
+    function ensureBgmAudio(){
+      if (bgmAudio) return bgmAudio;
+      const url = new URL("assets/配乐.mp3", location.href).href;
+      bgmAudio = new Audio(url);
+      bgmAudio.preload = "auto";
+      bgmAudio.loop = true;
+      bgmAudio.volume = BGM_VOL;
+      return bgmAudio;
+    }
+
+    function clearBgmFade(){
+      if (bgmFadeTimer){
+        window.clearInterval(bgmFadeTimer);
+        bgmFadeTimer = null;
+      }
+    }
+
+    function playBgm(){
+      try{
+        clearBgmFade();
+        const a = ensureBgmAudio();
+        a.volume = BGM_VOL;
+        const p = a.play();
+        if (p && typeof p.catch === "function"){
+          p.catch(() => {});
+        }
+      } catch {}
+    }
+
+    function stopBgm(){
+      try{
+        clearBgmFade();
+        if (!bgmAudio) return;
+        bgmAudio.pause();
+        bgmAudio.currentTime = 0;
+        bgmAudio.volume = BGM_VOL;
+      } catch {}
+    }
+
+    function fadeOutBgm(durationMs = 280){
+      clearBgmFade();
+      if (bgmDuckTimer){
+        window.clearTimeout(bgmDuckTimer);
+        bgmDuckTimer = null;
+      }
+      const a = bgmAudio;
+      if (!a){
+        return;
+      }
+      if (a.paused || a.volume < 0.001){
+        stopBgm();
+        return;
+      }
+      const startVol = a.volume;
+      const stepMs = 30;
+      const steps = Math.max(1, Math.floor(durationMs / stepMs));
+      let i = 0;
+      bgmFadeTimer = window.setInterval(() => {
+        i++;
+        const t = Math.min(1, i / steps);
+        try{
+          a.volume = Math.max(0, startVol * (1 - t));
+        } catch {}
+        if (t >= 1){
+          clearBgmFade();
+          try{
+            a.pause();
+            a.currentTime = 0;
+            a.volume = BGM_VOL;
+          } catch {}
+        }
+      }, stepMs);
+    }
+
+    function fadeInBgm(durationMs = 480){
+      clearBgmFade();
+      try{
+        const a = ensureBgmAudio();
+        a.volume = 0;
+        const p = a.play();
+        const runRamp = () => {
+          const stepMs = 30;
+          const steps = Math.max(1, Math.floor(durationMs / stepMs));
+          let i = 0;
+          bgmFadeTimer = window.setInterval(() => {
+            i++;
+            const t = Math.min(1, i / steps);
+            try{
+              a.volume = BGM_VOL * t;
+            } catch {}
+            if (t >= 1){
+              clearBgmFade();
+              try{ a.volume = BGM_VOL; } catch {}
+            }
+          }, stepMs);
+        };
+        if (p && typeof p.then === "function"){
+          p.then(runRamp).catch(runRamp);
+        } else {
+          runRamp();
+        }
+      } catch {}
+    }
+
+    function duckBgmForCashier(){
+      if (!bgmAudio || bgmAudio.paused) return;
+      try{
+        bgmAudio.volume = Math.min(BGM_VOL * 0.35, 0.06);
+        if (bgmDuckTimer){
+          window.clearTimeout(bgmDuckTimer);
+          bgmDuckTimer = null;
+        }
+        bgmDuckTimer = window.setTimeout(() => {
+          try{
+            if (bgmAudio && !bgmAudio.paused) bgmAudio.volume = BGM_VOL;
+          } catch {}
+        }, 650);
+      } catch {}
+    }
+
+    function makeRainAudio(){
+      const url = new URL("assets/雨声.mp3", location.href).href;
+      const a = new Audio(url);
+      a.preload = "auto";
+      a.loop = false;
+      a.volume = 0;
+      return a;
+    }
+
+    function fadeAudio(fromEl, toEl, durationMs = 280, targetVol = 0.55){
+      if (rainFadeTimer){
+        window.clearInterval(rainFadeTimer);
+        rainFadeTimer = null;
+      }
+      const stepMs = 20;
+      const steps = Math.max(1, Math.floor(durationMs / stepMs));
+      let i = 0;
+      rainFadeTimer = window.setInterval(() => {
+        i++;
+        const t = Math.min(1, i / steps);
+        if (toEl) toEl.volume = targetVol * t;
+        if (fromEl) fromEl.volume = targetVol * (1 - t);
+        if (t >= 1){
+          window.clearInterval(rainFadeTimer);
+          rainFadeTimer = null;
+          if (fromEl){
+            try{ fromEl.pause(); }catch{}
+            fromEl.currentTime = 0;
+          }
+        }
+      }, stepMs);
+    }
+
+    async function runRainCross(active, next){
+      if (!rainLoopRunning || rainCrossing) return;
+      if (!active || !next) return;
+      rainCrossing = true;
+      try{
+        next.currentTime = 0;
+        const p = next.play();
+        if (p && typeof p.catch === "function") await p.catch(() => {});
+        fadeAudio(active, next, 260, 0.55);
+        rainActive = (rainActive === "A") ? "B" : "A";
+      } catch {
+        // ignore; monitor 会继续兜底
+      } finally {
+        rainCrossing = false;
+      }
+    }
+
+    function scheduleRainCross(){
+      if (!rainLoopRunning) return;
+      if (rainCrossTimer){
+        window.clearTimeout(rainCrossTimer);
+        rainCrossTimer = null;
+      }
+      const active = rainActive === "A" ? rainA : rainB;
+      const next = rainActive === "A" ? rainB : rainA;
+      if (!active || !next) return;
+
+      const remain = (Number.isFinite(active.duration) ? (active.duration - active.currentTime) : 0);
+      if (!Number.isFinite(remain) || remain <= 0.35){
+        rainCrossTimer = window.setTimeout(scheduleRainCross, 200);
+        return;
+      }
+      const delay = Math.max(60, remain * 1000 - 260);
+      rainCrossTimer = window.setTimeout(async () => {
+        if (!rainLoopRunning) return;
+        await runRainCross(active, next);
+        scheduleRainCross();
+      }, delay);
+    }
+
+    function startRainMonitor(){
+      if (rainMonitorTimer){
+        window.clearInterval(rainMonitorTimer);
+        rainMonitorTimer = null;
+      }
+      rainMonitorTimer = window.setInterval(async () => {
+        if (!rainLoopRunning || rainCrossing) return;
+        const active = rainActive === "A" ? rainA : rainB;
+        const next = rainActive === "A" ? rainB : rainA;
+        if (!active || !next) return;
+
+        const remain = (Number.isFinite(active.duration) ? (active.duration - active.currentTime) : 999);
+        const endedOrPaused = active.ended || (active.paused && active.currentTime > 0.1);
+
+        if (endedOrPaused || remain < 0.28){
+          await runRainCross(active, next);
+        }
+      }, 120);
+    }
+
+    function boostRainHomeworkLevel(durationMs = 200, targetVol = 0.55){
+      if (rainFadeTimer){
+        window.clearInterval(rainFadeTimer);
+        rainFadeTimer = null;
+      }
+      if (rainBoostTimer){
+        window.clearInterval(rainBoostTimer);
+        rainBoostTimer = null;
+      }
+      const el = rainActive === "A" ? rainA : rainB;
+      if (!el) return;
+      const from = Number.isFinite(el.volume) ? el.volume : 0;
+      const stepMs = 25;
+      const steps = Math.max(1, Math.floor(durationMs / stepMs));
+      let i = 0;
+      rainBoostTimer = window.setInterval(() => {
+        i++;
+        const t = Math.min(1, i / steps);
+        try{
+          el.volume = from + (targetVol - from) * t;
+        } catch {}
+        if (t >= 1){
+          window.clearInterval(rainBoostTimer);
+          rainBoostTimer = null;
+        }
+      }, stepMs);
+    }
+
+    async function playRainLoop(opts){
+      opts = opts || {};
+      const prewarm = !!opts.prewarm;
+      try{
+        if (rainLoopRunning && !prewarm) return;
+        if (!rainA) rainA = makeRainAudio();
+        if (!rainB) rainB = makeRainAudio();
+
+        if (!rainLoopRunning){
+          rainLoopRunning = true;
+          rainActive = "A";
+          rainA.currentTime = 0;
+          rainA.volume = 0;
+          rainB.currentTime = 0;
+          rainB.volume = 0;
+          const p = rainA.play();
+          if (p && typeof p.catch === "function") await p.catch(() => {});
+          scheduleRainCross();
+          startRainMonitor();
+        }
+
+        const introMs = prewarm ? 170 : 320;
+        const introPeak = prewarm ? 0.34 : 0.55;
+        if (prewarm) rainPrewarmed = true;
+        fadeAudio(null, rainA, introMs, introPeak);
+      } catch {
+        if (!rainLoopRunning) rainLoopRunning = false;
+      }
+    }
+
+    function stopRainLoop(){
+      rainLoopRunning = false;
+      rainPrewarmed = false;
+      if (rainBoostTimer){
+        window.clearInterval(rainBoostTimer);
+        rainBoostTimer = null;
+      }
+      if (rainCrossTimer){
+        window.clearTimeout(rainCrossTimer);
+        rainCrossTimer = null;
+      }
+      if (rainMonitorTimer){
+        window.clearInterval(rainMonitorTimer);
+        rainMonitorTimer = null;
+      }
+      if (rainFadeTimer){
+        window.clearInterval(rainFadeTimer);
+        rainFadeTimer = null;
+      }
+      rainCrossing = false;
+      const fadeOutAndStop = (el, ms = 260) => {
+        if (!el) return;
+        const startVol = Number.isFinite(el.volume) ? el.volume : 0.55;
+        const stepMs = 20;
+        const steps = Math.max(1, Math.floor(ms / stepMs));
+        let i = 0;
+        const t = window.setInterval(() => {
+          i++;
+          const p = Math.min(1, i / steps);
+          try{
+            el.volume = Math.max(0, startVol * (1 - p));
+          } catch {}
+          if (p >= 1){
+            window.clearInterval(t);
+            try{
+              el.pause();
+              el.currentTime = 0;
+              el.volume = 0;
+            } catch {}
+          }
+        }, stepMs);
+      };
+      fadeOutAndStop(rainA, 280);
+      fadeOutAndStop(rainB, 280);
+    }
+
+    function playCashierDingSynth(){
+      try{
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        if (!Ctx) return;
+        const ctx = new Ctx();
+        const now = ctx.currentTime;
+
+        const gain = ctx.createGain();
+        gain.gain.setValueAtTime(0.0001, now);
+        gain.gain.exponentialRampToValueAtTime(0.18, now + 0.01);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.55);
+        gain.connect(ctx.destination);
+
+        const osc1 = ctx.createOscillator();
+        osc1.type = "sine";
+        osc1.frequency.setValueAtTime(1760, now);
+        osc1.frequency.exponentialRampToValueAtTime(1320, now + 0.12);
+        osc1.connect(gain);
+
+        const osc2 = ctx.createOscillator();
+        osc2.type = "triangle";
+        osc2.frequency.setValueAtTime(880, now);
+        osc2.frequency.exponentialRampToValueAtTime(660, now + 0.14);
+        osc2.connect(gain);
+
+        osc1.start(now);
+        osc2.start(now + 0.02);
+        osc1.stop(now + 0.55);
+        osc2.stop(now + 0.55);
+
+        window.setTimeout(() => { try{ ctx.close(); }catch{} }, 650);
+      } catch (e){
+        // ignore
+      }
+    }
+
+    // 第三页：覆盖背景小熊表情（持续 3 秒）
+    let storeBearMoodTimer = null;
+    let storeBubbleTimer = null;
+    let storeBubbleToastTimer = null;
+
+    function showStoreBubbleFrame(){
+      const el = document.getElementById("storeBubbleFrame");
+      if (!el) return;
+      el.style.display = "block";
+      if (storeBubbleTimer) window.clearTimeout(storeBubbleTimer);
+      storeBubbleTimer = window.setTimeout(() => {
+        el.style.display = "none";
+      }, 3000);
+    }
+
+    function showStoreBubbleToast(text){
+      const frame = document.getElementById("storeBubbleFrame");
+      const toast = document.getElementById("storeBubbleToast");
+      const stage = document.getElementById("storeStage");
+      if (!frame || !toast || !stage) return;
+
+      const stageRect = stage.getBoundingClientRect();
+      const r = frame.getBoundingClientRect();
+
+      // 文本区域限制在气泡主体内（避开尾巴），并支持最多两行
+      const innerLeft = r.left - stageRect.left + r.width * 0.16;
+      const innerTop = r.top - stageRect.top + r.height * 0.16 + 65;
+      const innerW = Math.max(1, r.width * 0.68);
+      const innerH = Math.max(1, r.height * 0.52);
+      toast.style.left = innerLeft + "px";
+      toast.style.top = innerTop + "px";
+      toast.style.width = innerW + "px";
+      toast.style.height = innerH + "px";
+      toast.textContent = text;
+      toast.style.display = "flex";
+
+      // 自动缩放字号：不超框，必要时换到第二行
+      let size = Math.max(18, Math.min(42, innerW * 0.24)) + 100;
+      toast.style.fontSize = size + "px";
+      toast.style.lineHeight = "1.2";
+      const maxHeight = innerH;
+      while (size > 16 && (toast.scrollHeight > maxHeight || toast.scrollWidth > innerW)) {
+        size -= 1;
+        toast.style.fontSize = size + "px";
+      }
+
+      // 最多显示两行，避免超出气泡框范围
+      const maxTwoLineHeight = size * 1.2 * 2;
+      toast.style.maxHeight = Math.min(maxHeight, maxTwoLineHeight) + "px";
+
+      if (storeBubbleToastTimer) window.clearTimeout(storeBubbleToastTimer);
+      storeBubbleToastTimer = window.setTimeout(() => {
+        toast.style.display = "none";
+      }, 3000);
+    }
+    function showStoreBearMood(isCorrect){
+      const el = document.getElementById("storeBearMood");
+      const base = document.getElementById("storeBearBase");
+      if (!el) return;
+      const fileName = isCorrect ? "assets/小熊大笑.png" : "assets/小熊惊讶.png";
+      el.src = new URL(fileName, location.href).href;
+
+      // 与当前“小熊”层完全重合，确保精准覆盖
+      if (base){
+        el.style.left = base.style.left || "0px";
+        el.style.top = base.style.top || "0px";
+        el.style.width = base.style.width || "0px";
+        el.style.height = base.style.height || "0px";
+      }
+
+      el.style.display = "block";
+      if (storeBearMoodTimer) window.clearTimeout(storeBearMoodTimer);
+      storeBearMoodTimer = window.setTimeout(() => {
+        if (!el) return;
+        el.style.display = "none";
+      }, 2000);
+    }
+
+    function setStoreKeypadEnabled(enabled){
+      storeKeypadButtons.forEach(btn => {
+        // 键位始终可点击，具体是否处理输入由点击逻辑判断（避免整块失效）
+        btn.style.pointerEvents = "auto";
+        btn.style.cursor = enabled ? "pointer" : "default";
+      });
+    }
+
+    function fitStorePillText(){
+      const pill = document.getElementById("priceDisplayBox");
+      if (!pill) return;
+
+      pill.style.whiteSpace = "nowrap";
+
+      let fs = parseFloat(getComputedStyle(pill).fontSize) || 32;
+      const maxW = pill.clientWidth;
+      const maxH = pill.clientHeight;
+
+      const minFs = 12;
+      while (fs > minFs){
+        pill.style.fontSize = fs + "px";
+        const okW = pill.scrollWidth <= maxW + 1;
+        const okH = pill.scrollHeight <= maxH + 1;
+        if (okW && okH) break;
+        fs -= 1;
+      }
+    }
+
+    function ensureStoreKeypadOverlay(bgNaturalW = 14187, bgNaturalH = 8119){
+      const keypadLayer = document.getElementById("keypadLayer");
+      if (!keypadLayer) return;
+
+      if (storeKeypadButtons.length) return; // 已创建
+
+      const makeKey = (key, x, y, w, h) => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "keypadKey";
+        btn.dataset.key = key;
+        // 给提交/删除键更高层级：避免与数字热区重叠时误命中
+        btn.style.zIndex = (key === "✓" || key === "×") ? "30" : "10";
+        btn.style.left = x + "px";
+        btn.style.top = y + "px";
+        btn.style.width = w + "px";
+        btn.style.height = h + "px";
+        btn.textContent = key; // 无视觉（透明），但对可访问性有帮助
+        btn.setAttribute("aria-label", key);
+        keypadLayer.appendChild(btn);
+        return btn;
+      };
+
+      // 以 14187x8119 为设计基准，按当前背景 natural 尺寸做缩放
+      const sx = Math.max(0.01, bgNaturalW / 14187);
+      const sy = Math.max(0.01, bgNaturalH / 8119);
+
+      // natural 坐标系（设计基准 14187x8119）热区近似值：
+      // 如果你发现点不中某个数字，再微调这里的 x/y/w/h。
+      // 你反馈出现“点 5 显示 3 / 点 8 显示 6”等错位，说明热区在背景自然坐标里整体偏移；
+      // 这里先做统一平移，让热区跟随实际键盘位置对齐。
+      const KEYPAD_SHIFT_X = 750 * sx;   // 向右平移（缩放后）
+      // 热区偏上会导致相邻行误命中（例如点“1”触发“4”）
+      // 因此这里相对原值整体下移一点，并配合缩小键高降低重叠。
+      const KEYPAD_SHIFT_Y = -470 * sy;  // 向上平移（缩放后，数值绝对值略减小）
+
+      // natural 像素热区（避免相邻行重叠，否则会误命中相邻数字）
+      const keys = [
+        ["1", 9800, 5450, 750, 500],
+        ["2", 10550, 5450, 750, 500],
+        ["3", 11300, 5450, 750, 500],
+        ["4", 9800, 5970, 750, 500],
+        ["5", 10550, 5970, 750, 500],
+        ["6", 11300, 5970, 750, 500],
+        ["7", 9800, 6490, 750, 500],
+        ["8", 10550, 6490, 750, 500],
+        ["9", 11300, 6490, 750, 500],
+        // 0 按键：挪到底排右侧（防止左下角红键当成 0）
+        ["0", 10550, 7010, 750, 500],
+      ];
+
+      // ×（退格）：只占右侧下方区域，不与 0/上行重叠
+      const delKey = makeKey(
+        "×",
+        9800 * sx + KEYPAD_SHIFT_X,
+        7010 * sy + KEYPAD_SHIFT_Y,
+        750 * sx,
+        500 * sy
+      );
+      delKey.setAttribute("aria-label", "退格");
+
+      // ✓（提交）：右下角绿色按钮热区
+      // 关键点：按同样的 shift 对齐，且宽度控制在自然画布范围内
+      // 说明：为避免与 × 热区边界微重叠（导致你点击 ✓ 时却触发退格），这里把 ✓ 热区做得更“靠右更窄更低”。
+      const submitKey = makeKey(
+        "✓",
+        11300 * sx + KEYPAD_SHIFT_X, // 最右列：作答结束
+        7010 * sy + KEYPAD_SHIFT_Y,
+        750 * sx,
+        500 * sy
+      );
+      submitKey.setAttribute("aria-label", "提交");
+
+      keys.forEach(([k, x, y, w, h]) => {
+        makeKey(
+          k,
+          x * sx + KEYPAD_SHIFT_X,
+          y * sy + KEYPAD_SHIFT_Y,
+          w * sx,
+          h * sy
+        );
+      });
+
+      storeKeypadButtons = Array.from(keypadLayer.querySelectorAll(".keypadKey"));
+      setStoreKeypadEnabled(false); // 默认禁用
+
+      storeKeypadButtons.forEach(btn => {
+        btn.addEventListener("click", () => {
+          const key = btn.dataset.key;
+          const pill = document.getElementById("priceDisplayBox");
+          if (!pill) return;
+
+          if (key === "×") {
+            storeAnswer = storeAnswer.slice(0, -1);
+          } else if (key === "✓") {
+            const btnStoreComplete = document.getElementById("btnStoreComplete");
+            const val = storeAnswer === "" ? NaN : Number.parseInt(storeAnswer, 10);
+            if (!Number.isFinite(val) || storeExpectedAnswer == null) {
+              setBubble("先输入答案哦～");
+              showToast("先输入答案哦～");
+        return;
+      }
+
+            if (val === storeExpectedAnswer) {
+              showStoreBubbleFrame();
+              showStoreBearMood(true);
+              const randomIndex = Math.floor(Math.random() * encouragementMessages.length);
+              const randomMessage = encouragementMessages[randomIndex];
+              setBubble(randomMessage);
+              // 简单弹动动画（仅改变该文本元素）
+              if (bubbleTextEl){
+                bubbleTextEl.style.transition = "transform 200ms ease";
+                bubbleTextEl.style.transform = "scale(1.03)";
+                window.setTimeout(() => {
+                  bubbleTextEl.style.transform = "";
+                }, 220);
+              }
+              const isLastStoreRound = storeRoundIndex === storeTotalRounds - 1;
+              playCashierDing({ skipBgmDuck: isLastStoreRound });
+              if (isLastStoreRound){
+                fadeOutBgm(560);
+                window.setTimeout(() => { playRainLoop({ prewarm: true }); }, 28);
+              }
+              showStoreBubbleToast(randomMessage);
+              // 给你一点反馈时间，再走下一步
+              window.setTimeout(() => {
+                // 前 3 次答对：刷新篮筐继续；第 4 次答对：直接进入下一步
+                if (storeRoundIndex < storeTotalRounds - 1){
+                  storeRoundIndex += 1;
+                  renderStoreSnacks();
+                } else {
+                  setBubble("结账完成！我们继续写作业吧～");
+                  goNext();
+                }
+              }, 1200);
+            } else {
+              showStoreBubbleFrame();
+              showStoreBearMood(false);
+              setBubble("再仔细想一想");
+              showStoreBubbleToast("再仔细想一想");
+            }
+          } else if (/^\d$/.test(key)) {
+            if (storeAnswer.length < 6) storeAnswer += key; // 防溢出
+          } else {
+            return;
+          }
+
+          pill.textContent = storeEquationExpr + "=" + storeAnswer;
+          fitStorePillText();
+        });
+      });
+    }
+
+    function shuffleStorePool(arr){
+      const a = [...arr];
+      for (let i = a.length - 1; i > 0; i--){
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a;
+    }
+
+    function renderStoreSnacks(){
+      const stage = document.getElementById("storeStage");
+      const bgImg = document.getElementById("storeBg");
+      const basket = document.getElementById("snackBasket");
+      const bearBase = document.getElementById("storeBearBase");
+      const basketBase = document.getElementById("storeBasketBase");
+      const pill = document.getElementById("priceDisplayBox");
+      const scannedListPanel = document.getElementById("scannedListPanel");
+      const scannedListBody = document.getElementById("scannedListBody");
+      const priceLayer = document.getElementById("priceLayer");
+      const keypadLayer = document.getElementById("keypadLayer");
+      if (!stage || !bgImg || !basket) return;
+      
+
+        // 防止在图片尚未计算出 natural 尺寸时渲染布局
+      // 确保文字永远不超出键盘框：自动缩小字号直到 scrollWidth/scrollHeight 不再超出
+      function fitSnackExpressionText(){
+        if (!pill) return;
+        // 单行显示，避免换行导致的高度溢出
+        pill.style.whiteSpace = "nowrap";
+
+        let fs = parseFloat(getComputedStyle(pill).fontSize) || 32;
+        const maxW = pill.clientWidth;
+        const maxH = pill.clientHeight;
+
+        // 保险下限
+        const minFs = 12;
+        while (fs > minFs){
+          pill.style.fontSize = fs + "px";
+          // scrollWidth/scrollHeight 在 overflow hidden 下仍可用于判断是否溢出
+          const okW = pill.scrollWidth <= maxW + 1;
+          const okH = pill.scrollHeight <= maxH + 1;
+          if (okW && okH) break;
+          fs -= 1;
+        }
+      }
+
+      const doRender = () => {
+        const nW = bgImg.naturalWidth || 0;
+        const nH = bgImg.naturalHeight || 0;
+        if (!nW || !nH) return;
+
+        // 刷新动画：先让旧零食淡出，再替换为新零食（避免“僵硬跳变”）
+        // 关键：每轮只淡出一次。淡出完成后清空旧零食再进入正常渲染，避免卡在“永远淡出”。
+        const oldImgs = Array.from(basket.querySelectorAll("img"));
+        const fadeDone = basket.dataset.fadeDone === "1";
+        if (oldImgs.length && !fadeDone){
+          basket.dataset.fadeDone = "1";
+          oldImgs.forEach(im => {
+            im.style.opacity = "0";
+            const t = im.style.transform || "";
+            im.style.transform = (t ? (t + " ") : "") + "scale(0.90)";
+          });
+          window.setTimeout(() => {
+            if (!basket) return;
+            basket.innerHTML = "";
+            doRender();
+          }, 220);
+          return;
+        }
+        // 进入正式渲染前清掉标记
+        basket.dataset.fadeDone = "";
+
+        basket.innerHTML = "";
+        // 每次渲染都重建键盘热区，避免坐标/禁用状态残留
+        if (keypadLayer){
+          keypadLayer.innerHTML = "";
+        }
+        storeKeypadButtons = [];
+        ensureStoreKeypadOverlay(nW, nH);
+
+        // 重置“加法/价格显示”
+        storeSnackClickedPrices = [];
+        storeEquationExpr = "";
+        storeAnswer = "";
+        storeEquationReady = false;
+        setStoreKeypadEnabled(false);
+        if (pill){
+          pill.textContent = "";
+          pill.style.fontSize = "";
+        }
+        if (scannedListBody) scannedListBody.innerHTML = "";
+        if (scannedListPanel) scannedListPanel.style.display = "block";
+        stage.querySelectorAll(".snackJiaFaPop").forEach(el => el.remove());
+        // 每轮决定两种模式之一：重复(乘法) or 不重复(加法)
+        // 同时控制每轮刷新物品数量为 2 或 3，避免一直只出一种。
+        if (!storeRoundPlan){
+          const buildPlan = () => {
+            const types = ["dup3","dup2","add3","add2"]; // dup: 重复(乘法), add: 不重复(加法)
+            for (let tries = 0; tries < 120; tries++){
+              const plan = Array.from({ length: storeTotalRounds }, () => types[Math.floor(Math.random() * types.length)]);
+              const dupAny = plan.some(x => x.startsWith("dup"));
+              const addAny = plan.some(x => x.startsWith("add"));
+              const variety = new Set(plan).size > 1;
+              const first3 = plan.slice(0, 3);
+              const dupFirst = first3.some(x => x.startsWith("dup"));
+              const addFirst = first3.some(x => x.startsWith("add"));
+              if (dupAny && addAny && variety && dupFirst && addFirst) return plan;
+            }
+            // 极端兜底：保证“混合出现”
+            return ["dup3","add2","dup2","add3"];
+          };
+          storeRoundPlan = buildPlan();
+        }
+
+        const roundType = storeRoundPlan[storeRoundIndex] || "dup3";
+        let roundEquationExpr = ""; // 最终展示的算式（只包含本轮需要的运算：× 或 +）
+        let roundExpectedAnswer = null; // 提交时要比对的正确值
+
+        const pool = storeSnackPool;
+        const getPrice = (item) => storeSnackPriceMap[item.split("/").pop()];
+        const pickDistinct = (k) => shuffleStorePool(pool).slice(0, k);
+
+        let chosen = [];
+        const n = pool.length;
+        const maxTries = 120;
+
+        if (roundType === "dup3"){
+          // 两样相同 + 一个不同：dup×2 + diff（去掉减法）
+          for (let guard = 0; guard < maxTries; guard++){
+            const dupItem = pool[Math.floor(Math.random() * n)];
+            const diffItem = pool[Math.floor(Math.random() * n)];
+            if (diffItem === dupItem) continue;
+            const dupVal = getPrice(dupItem);
+            const diffVal = getPrice(diffItem);
+            if (!Number.isFinite(dupVal) || !Number.isFinite(diffVal)) continue;
+            if (dupVal === diffVal) continue; // “不一样”避免值也一样导致看起来像同一种
+            const expected = dupVal * 2 + diffVal;
+            if (!Number.isFinite(expected)) continue;
+
+            chosen = shuffleStorePool([dupItem, dupItem, diffItem]);
+            roundEquationExpr = `${dupVal}×2+${diffVal}`;
+            roundExpectedAnswer = expected;
+            break;
+          }
+          if (!chosen.length){
+            // 兜底：退化为 add3（仍可继续游戏）
+            chosen = pickDistinct(3);
+            const vals = chosen.map(getPrice);
+            roundEquationExpr = vals.join("+");
+            roundExpectedAnswer = vals.reduce((a,b)=>a+b,0);
+          }
+        } else if (roundType === "dup2"){
+          // 两个一样：dup×2
+          const dupItem = pool[Math.floor(Math.random() * n)];
+          const dupVal = getPrice(dupItem);
+          chosen = [dupItem, dupItem];
+          roundEquationExpr = `${dupVal}×2`;
+          roundExpectedAnswer = dupVal * 2;
+        } else if (roundType === "add3"){
+          // 三个不重复：a+b+c
+          chosen = pickDistinct(3);
+          const vals = chosen.map(getPrice);
+          roundEquationExpr = vals.join("+");
+          roundExpectedAnswer = vals.reduce((a,b)=>a+b,0);
+        } else {
+          // add2：两个不重复：a+b
+          chosen = pickDistinct(2);
+          const vals = chosen.map(getPrice);
+          roundEquationExpr = vals.join("+");
+          roundExpectedAnswer = vals.reduce((a,b)=>a+b,0);
+        }
+
+        // 用于后续间距计算：本轮物品数量可能是 2 或 3
+        const count = chosen.length;
+
+          chosen.forEach(src => {
+          const im = document.createElement("img");
+          im.src = src;
+          im.alt = "零食";
+          const fileName = src.split("/").pop();
+          const price = storeSnackPriceMap[fileName];
+          im.dataset.snackName = fileName;
+          im.dataset.snackPrice = String(price ?? "");
+          // 默认不置入价格（如果没找到映射，点击会忽略）
+          // 入场动画：先隐藏，下一帧淡入（配合 CSS transition）
+          im.style.opacity = "0";
+          basket.appendChild(im);
+
+          // 点击：显示价格 + 形成“加法表达式”（生成“表达式=”后启用键盘输入）
+          im.addEventListener("click", (e) => {
+            e.stopPropagation();
+            if (im.dataset.clicked === "1") return;
+
+            // 如果价格映射异常，先兜底为 0，保证点击后表达式与 "=" 判定不会卡住
+            let p = Number.parseInt(im.dataset.snackPrice || "", 10);
+            if (!Number.isFinite(p)) p = 0;
+
+            im.dataset.clicked = "1";
+            im.style.opacity = "0.45";
+            im.style.filter = "grayscale(.35)";
+
+            // 收银电脑旁“已扫码清单”：追加缩略图 + 价格
+            if (scannedListBody){
+              const row = document.createElement("div");
+              row.className = "scannedItem";
+              const thumb = document.createElement("img");
+              thumb.src = src;
+              thumb.alt = "已扫码";
+              const priceEl = document.createElement("div");
+              priceEl.className = "scannedItemPrice";
+              priceEl.textContent = `￥${p}`;
+              row.appendChild(thumb);
+              row.appendChild(priceEl);
+              scannedListBody.appendChild(row);
+            }
+
+            if (pill){
+              // 可靠判定：以“实际被点击的零食 DOM”数量为准
+              const clickedImgs = Array.from(basket.querySelectorAll('img[data-clicked="1"]'));
+              const clickedPrices = clickedImgs.map(img => {
+                const v = Number.parseInt(img.dataset.snackPrice || "", 10);
+                return Number.isFinite(v) ? v : 0;
+              });
+              storeSnackClickedPrices = clickedPrices;
+
+              const partialExpr = clickedPrices.join("+");
+              const isAllClicked = (clickedImgs.length === chosen.length);
+
+              // 每次点零食都清空输入，直到本轮“点完全部”后才生成最终方程并启用键盘
+              storeAnswer = "";
+
+              if (isAllClicked){
+                // 本轮最终算式由 roundType 预先生成，避免“乘法/加法混着出”
+                storeEquationExpr = roundEquationExpr;
+                storeEquationReady = true;
+                storeExpectedAnswer = roundExpectedAnswer;
+                setStoreKeypadEnabled(true);
+                pill.textContent = roundEquationExpr + "=";
+                setScanCursor(false);
+              } else {
+                // 还没点完：先显示部分和（用 + 拼出来）
+                storeEquationExpr = partialExpr;
+                storeEquationReady = false;
+                storeExpectedAnswer = null;
+                setStoreKeypadEnabled(false);
+                pill.textContent = partialExpr;
+              }
+            }
+            if (pill) fitSnackExpressionText();
+
+          // 生成“jia'fa”（+金额）飘字动画
+            const pop = document.createElement("div");
+            pop.className = "snackJiaFaPop";
+            pop.textContent = `+${p}`;
+            stage.appendChild(pop);
+
+            // 将动画居中对齐到 pill 的中心
+            if (pill){
+              const cRect = stage.getBoundingClientRect();
+              const pRect = pill.getBoundingClientRect();
+              const left = (pRect.left - cRect.left + pRect.width / 2);
+              const top = (pRect.top - cRect.top + 6);
+              pop.style.left = left + "px";
+              pop.style.top = top + "px";
+              pop.style.transform = "translate(-50%, 0)";
+            } else {
+              pop.style.left = "50%";
+              pop.style.top = "30%";
+            }
+
+            window.setTimeout(() => pop.remove(), 760);
+          });
+        });
+
+        // 通过 object-fit: contain 的“实际可视区域”来定位篮筐框，避免拉伸导致偏移
+        const elW = bgImg.clientWidth;
+        const elH = bgImg.clientHeight;
+        const ratio = nW / nH;
+
+        // 计算 contain 显示区域尺寸
+        let dispW, dispH;
+        if (elW / elH > ratio){
+          dispH = elH;
+          dispW = dispH * ratio;
+        } else {
+          dispW = elW;
+          dispH = dispW / ratio;
+        }
+
+        const offsetX = (elW - dispW) / 2;
+        const offsetY = (elH - dispH) / 2;
+
+        // 篮筐区域（基于背景图内坐标的经验值）
+        // 你后续如果发现偏了，我只需要调这 4 个百分比即可。
+        // 偏左问题：把篮筐整体向右挪一点
+        const leftPct = 0.2;
+        const bottomPct = 0.10;
+        // 适当增大篮筐宽度，避免“图标过小”
+        const widthPct = 0.45;
+        // 为了让旋转后的零食不会被裁切，稍微增大篮筐高度
+        // 适当增大篮筐高度，配合图标字号/缩放更统一
+        const heightPct = 0.26;
+
+          const basketLeft = offsetX + dispW * leftPct;
+          const basketWidth = dispW * widthPct;
+          const basketHeight = dispH * heightPct;
+          const basketTop = offsetY + dispH * (1 - bottomPct - heightPct);
+
+          // 3个零食时：只移动“零食图标区域”，小熊/购物筐位置不变
+          const shiftX = (count === 3) ? 70 : 0; // 3个零食时整体向左 70px（在当前基础上再左移30px；小熊/购物筐不变）
+          const shiftY = (count === 3) ? 20 : 0;
+          const shiftYAll = 40; // 全局下移
+          const shiftXAll = 70; // 全局左移
+
+          // 零食区域（会在 3 个时额外偏移）
+          const snackLeftPx = (basketLeft - shiftX - shiftXAll);
+          const snackTopPx = (basketTop + shiftY + shiftYAll);
+
+          // 基准区域（不受 3 个时额外偏移影响）：用于小熊/购物筐保持不动
+          const baseLeftPx = (basketLeft - shiftXAll);
+          const baseTopPx = (basketTop + shiftYAll);
+
+        basket.style.left = snackLeftPx + "px";
+        basket.style.top = snackTopPx + "px";
+        basket.style.width = basketWidth + "px";
+        basket.style.height = basketHeight + "px";
+
+        // “小熊”放在零食刷新区域下一层（同区域位置尺寸，层级低于 snackBasket）
+        if (bearBase){
+          bearBase.style.display = "block";
+          // 小熊位置固定：只在首次渲染时设定，后续刷新零食不再变动
+          if (!bearBase.dataset.lockedPos){
+            bearBase.style.left = `calc(${baseLeftPx}px - 420px)`;
+            bearBase.style.top = `calc(${baseTopPx}px - 500px)`;
+            bearBase.style.width = `calc(${basket.style.width} + 500px)`;
+            bearBase.style.height = `calc(${basket.style.height} + 500px)`;
+            bearBase.dataset.lockedPos = "1";
+          }
+        }
+        if (basketBase){
+          basketBase.style.display = "block";
+          // 购物筐位置固定：只在首次渲染时设定，后续刷新零食不再变动
+          if (!basketBase.dataset.lockedPos){
+            basketBase.style.left = `calc(${baseLeftPx}px - 280px)`;
+            basketBase.style.top = `calc(${baseTopPx}px - 120px)`;
+            basketBase.style.width = `calc(${basket.style.width} + 200px)`;
+            basketBase.style.height = `calc(${basket.style.height} + 200px)`;
+            basketBase.dataset.lockedPos = "1";
+          }
+        }
+
+        // 气泡框定位：放在小熊右上角（跟随基准区域，不随3个零食额外偏移）
+        // 显示时机：在“提交答案(✓)”时显示 3 秒，因此这里仅更新位置与尺寸，不强制显示。
+        const bubbleFrame = document.getElementById("storeBubbleFrame");
+        if (bubbleFrame){
+          bubbleFrame.style.left = `calc(${baseLeftPx}px + 390px)`; /* 再向右 +80px */
+          bubbleFrame.style.top = `calc(${baseTopPx}px - 520px)`;
+          bubbleFrame.style.width = "310px"; /* 放大 50px */
+          bubbleFrame.style.height = "auto";
+        }
+
+          // 定位收银机显示框（核心代码段）
+          // 强制要求：算式必须只渲染在 (8500,4200)-(12800,5800) 对应的深灰圆角框内。
+          // 核心策略：不再直接计算 priceDisplayBox 的 left/top（容易受 object-fit: cover 影响导致偏移），
+          // 而是把 natural 坐标系整体通过 translate(offsetX, offsetY) + scale(scaleCover) 对齐到当前屏幕：
+          // - priceLayer 负责“natural 坐标系 -> 屏幕坐标系”的对齐
+          // - priceDisplayBox 在 natural 坐标系里以固定像素坐标写死，所以文字必然只出现在目标深灰框内
+          if (priceLayer){
+            const scaleCover = Math.max(elW / nW, elH / nH);
+            const dispWc = nW * scaleCover;
+            const dispHc = nH * scaleCover;
+            const offsetXc = (elW - dispWc) / 2;
+            const offsetYc = (elH - dispHc) / 2;
+
+            priceLayer.style.width = nW + "px";
+            priceLayer.style.height = nH + "px";
+            priceLayer.style.transform = `translate(${offsetXc}px, ${offsetYc}px) scale(${scaleCover})`;
+
+            // 键盘热区与 priceLayer 同步自然坐标对齐（object-fit: cover）
+            if (keypadLayer){
+              keypadLayer.style.width = nW + "px";
+              keypadLayer.style.height = nH + "px";
+              keypadLayer.style.transform = `translate(${offsetXc}px, ${offsetYc}px) scale(${scaleCover})`;
+            }
+          }
+          // ====== 精准定位收银机显示框（基于当前实际背景图检测）======
+          // 这样无论你的背景图像素级有微小偏差，算式文本都能严格显示在该深灰框内。
+          if (pill){
+            // ====== 显示框坐标定义（natural 像素空间）======
+            // 设计稿提供坐标（作为 fallback）：14187x8119 -> (8500,4200)-(12800,5800)
+            const boxDesign = { x1: 8500, y1: 4200, x2: 12800, y2: 5800 };
+            const sxBox = nW / 14187;
+            const syBox = nH / 8119;
+            let fallback = {
+              x1: boxDesign.x1 * sxBox,
+              y1: boxDesign.y1 * syBox,
+              x2: boxDesign.x2 * sxBox,
+              y2: boxDesign.y2 * syBox,
+            };
+
+            // ROI：限制在右侧键盘上方，减少误检
+            const roi = {
+              x1: Math.max(0, Math.floor(0.55 * nW)),
+              y1: Math.max(0, Math.floor(0.45 * nH)),
+              x2: Math.min(nW, Math.ceil(0.95 * nW)),
+              y2: Math.min(nH, Math.ceil(0.80 * nH)),
+            };
+
+            let detected = null;
+            try{
+              const roiW = Math.max(10, roi.x2 - roi.x1);
+              const roiH = Math.max(10, roi.y2 - roi.y1);
+              const canvas = document.createElement("canvas");
+              canvas.width = roiW;
+              canvas.height = roiH;
+              const ctx = canvas.getContext("2d", { willReadFrequently: true });
+              ctx.drawImage(bgImg, roi.x1, roi.y1, roiW, roiH, 0, 0, roiW, roiH);
+              const imgData = ctx.getImageData(0, 0, roiW, roiH);
+              const data = imgData.data;
+
+              const step = Math.max(4, Math.floor(Math.min(roiW, roiH) / 250));
+              let minX = roiW, minY = roiH, maxX = 0, maxY = 0;
+              let found = 0;
+
+              // 深灰色区域判定：RGB 接近 + 中等亮度（排除太亮按键与太暗阴影）
+              for (let yy = 0; yy < roiH; yy += step){
+                for (let xx = 0; xx < roiW; xx += step){
+                  const idx = (yy * roiW + xx) * 4;
+                  const r = data[idx], g = data[idx + 1], b = data[idx + 2];
+                  const grayish = Math.abs(r - g) < 18 && Math.abs(g - b) < 18;
+                  const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+                  const isBoxGray = grayish && lum > 55 && lum < 160 && r < 170;
+                  if (!isBoxGray) continue;
+
+                  found++;
+                  if (xx < minX) minX = xx;
+                  if (yy < minY) minY = yy;
+                  if (xx > maxX) maxX = xx;
+                  if (yy > maxY) maxY = yy;
+                }
+              }
+
+              // 宽高比约等于 4300/1600 ~= 2.687，允许一定误差
+              if (found > 80){
+                const pad = Math.floor(step * 2);
+                const x1 = Math.max(0, Math.floor(roi.x1 + minX - pad));
+                const y1 = Math.max(0, Math.floor(roi.y1 + minY - pad));
+                const x2 = Math.min(nW, Math.ceil(roi.x1 + maxX + pad));
+                const y2 = Math.min(nH, Math.ceil(roi.y1 + maxY + pad));
+
+                const w = x2 - x1;
+                const h = y2 - y1;
+                const aspect = w / Math.max(1, h);
+                if (w > 0 && h > 0 && aspect > 2.0 && aspect < 3.6){
+                  detected = { x1, y1, x2, y2 };
+                }
+              }
+            } catch(e){
+              // ignore -> fallback
+            }
+
+            const box = detected || fallback;
+            const w = Math.max(1, box.x2 - box.x1);
+            const h = Math.max(1, box.y2 - box.y1);
+
+            // ====== 文本渲染到显示框内的核心代码行 ======
+            // pill 在 priceLayer 的 natural 像素坐标系中，因此直接写 natural 坐标即可精准对齐。
+            // 向上移动 30px（屏幕像素）。由于 pill 位于 priceLayer 的 natural 坐标系中，
+            // 需要把 30px 换算成 natural 位移量：30 / scaleCover。
+            const scaleCoverNow = Math.max(elW / nW, elH / nH);
+            // 由“上移 32px”改为“上移 12px”，等效整体下移 20px
+            const yShiftNatural = 12 / Math.max(0.0001, scaleCoverNow);
+            // 右移 90px（原需求）+ 再整体向右平移 10px（在当前基础上再 +7px）
+            const xShiftNatural = (90 + 10) / Math.max(0.0001, scaleCoverNow);
+            pill.style.left = (box.x1 + xShiftNatural) + "px";
+            pill.style.top = (box.y1 - yShiftNatural) + "px";
+            pill.style.width = w + "px";
+            pill.style.height = h + "px";
+            // 初始字号：点击后会 fitSnackExpressionText 做严格适配
+            // 48px -> 8 倍：384px。h 为显示框高度（natural 像素空间），h*0.24 在 1600 时约等于 384。
+            pill.style.fontSize = Math.max(18, Math.min(500, h * 0.24) - 50) + "px";
+
+            // 已扫码清单：跟随收银显示框定位到右侧，避免因背景尺寸变化而“看不见”
+            if (scannedListPanel){
+              const margin = 260;
+              // 先算面板“目标尺寸”，再强制整体缩小 50px（避免被 min 值钳住看不出变化）
+              const panelW0 = Math.max(950, Math.min(1700, Math.floor(w * 0.42)));
+              const panelH0 = Math.max(1200, Math.min(2600, Math.floor(h * 1.55) - 25));
+              // 在之前基础上再整体缩小 60px（总共缩小 110px）
+              const panelW = Math.max(300, panelW0 - 110);
+              const panelH = Math.max(300, panelH0 - 110);
+              const leftRaw = box.x2 + xShiftNatural + margin;
+              const topRaw = box.y1 - yShiftNatural + Math.floor(h * 0.10);
+              const maxLeft = Math.max(0, nW - panelW - 40);
+              const maxTop = Math.max(0, nH - panelH - 40);
+              // 先按边界求默认位置，再额外左移，避免“平移被 maxLeft 钳死看不出变化”
+              const defaultLeft = Math.max(40, Math.min(maxLeft, leftRaw));
+              const left = Math.max(40, defaultLeft - 1200);
+              const top = Math.max(40, Math.min(maxTop, topRaw + 170));
+
+              scannedListPanel.style.left = left + "px";
+              scannedListPanel.style.top = top + "px";
+              scannedListPanel.style.width = panelW + "px";
+              scannedListPanel.style.maxHeight = panelH + "px";
+            }
+          }
+
+          // 紧凑并排：相邻图标左右间距约 20-30px
+          // 收窄间距范围，让图标尺寸更统一
+          const gapPx = 18 + Math.random() * 4; // [18, 22]
+          basket.style.gap = gapPx + "px";
+
+          // 单行不换行（仅2-3个），必要时缩小图标宽度以保证不出篮筐
+          // 放大零食图标：允许更大的单个图标宽度
+          // 放大零食图标上限，避免过小
+          const maxItemW = 150;
+          const totalGap = Math.max(0, gapPx * (count - 1));
+          const availW = Math.max(1, basketWidth - totalGap);
+          const itemW = Math.min(maxItemW, availW / count);
+
+          const imgs = Array.from(basket.querySelectorAll("img"));
+
+          // 为每个图标生成“不同角度”的随机旋转
+          const angles = [];
+          function pickAngle(){
+            let a = -20 + Math.random() * 40; // [-20, 20]
+            // 让角度尽量不重复（差值>=8deg）
+            for (let guard = 0; guard < 12; guard++){
+              const ok = angles.every(x => Math.abs(x - a) >= 8);
+              if (ok) break;
+              a = -20 + Math.random() * 40;
+            }
+            angles.push(a);
+            return a;
+          }
+
+          imgs.forEach((im, i) => {
+            const snackName = im.dataset.snackName || "";
+            let widthAdjust = 0;
+            // 在目前大小上叠加：
+            // 溜溜梅 +30，牛奶/椰汁 -20，可比克再 +10(总 +40)，安慕希再 -10(总 -40)
+            if (snackName === "溜溜梅.png") widthAdjust = 30;
+            if (snackName === "牛奶.png") widthAdjust = -20;
+            if (snackName === "椰汁.png") widthAdjust = -30;
+            if (snackName === "可比克.png") widthAdjust = 40;
+            if (snackName === "安慕希.png") widthAdjust = -40;
+            const finalW = Math.max(40, itemW + widthAdjust);
+
+            im.style.width = finalW + "px";
+            im.style.height = "auto";
+            im.style.maxHeight = "100%";
+            im.style.transformOrigin = "center center";
+
+            const angle = pickAngle();
+            // 轻微上下错落（很小幅度，避免被裁切）
+            const y = Math.random() * 4 - 2; // [-2, 2]
+            // 先缩小一点，下一帧过渡到目标 transform
+            const target = `translateY(${y}px) rotate(${angle}deg) scale(1)`;
+            im.dataset.targetTransform = target;
+            im.style.transform = `translateY(${y}px) rotate(${angle}deg) scale(0.86)`;
+          });
+
+          window.requestAnimationFrame(() => {
+            imgs.forEach(im => {
+              im.style.opacity = "1";
+              im.style.transform = im.dataset.targetTransform || im.style.transform.replace("scale(0.86)", "scale(1)");
+            });
+            setScanCursor(true);
+          });
+      };
+
+      if (bgImg.complete && bgImg.naturalWidth > 0){
+        doRender();
+      } else {
+        bgImg.addEventListener("load", doRender, { once: true });
+      }
+    }
+
+    // 初始页（图片热点） -> 选择页
+    document.getElementById("hotStart").addEventListener("click", () => showPage("select"));
+
+    // 选择页返回/识字入口已移除
+    // 选择页热点：算数（也可以先开始）
+    document.getElementById("hotMath").addEventListener("click", () => {
+      pathLocked = true;
+      setFlow();
+      showPage("hanziGame");
+    });
+
+    // 便利店场景完成按钮已移除：改为在键盘提交后自动 goNext()
+
+    // 总结页返回首页：解锁 + 重置
+    document.getElementById("btnBackHome").addEventListener("click", () => {
+      pathLocked = false;
+      resetAllProgress();
+      showPage("welcome");
+    });
+
+    /***********************
+     * 情绪按钮（全页生效）
+     ***********************/
+    const moodTextMap = {
+      happy: "你学得好认真呀！",
+      tired: "是不是累了？休息一下喝口水吧～",
+      distracted: "嘿，我们一起集中注意力好吗？",
+    };
+    document.querySelectorAll(".moodBtn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const mood = btn.dataset.mood;
+        setBubble(moodTextMap[mood] || "我在这里陪你～");
+      });
+    });
+
+    /***********************
+     * 识字游戏（3题固定题库）
+     ***********************/
+    // 识字题库（包含词语 + 一些短语，可继续扩展）
+    const hanziPool = [
+      { pic: "🌞", options: ["太阳","月亮","星星"], correctIndex: 0 },
+      { pic: "🌙", options: ["月亮","太阳","星星"], correctIndex: 0 },
+      { pic: "⭐", options: ["星星","月亮","太阳"], correctIndex: 0 },
+      { pic: "🐱", options: ["小狗","小猫","小兔"], correctIndex: 1 },
+      { pic: "🐶", options: ["小猫","小狗","小兔"], correctIndex: 1 },
+      { pic: "🐰", options: ["小兔","小狗","小猫"], correctIndex: 0 },
+      { pic: "🍎", options: ["苹果","香蕉","橘子"], correctIndex: 0 },
+      { pic: "🍌", options: ["香蕉","橘子","苹果"], correctIndex: 0 },
+      { pic: "🍊", options: ["橘子","苹果","香蕉"], correctIndex: 0 },
+      // 短语题（更有趣、更贴近儿童表达）
+      { pic: "🌞", options: ["太阳出来啦","月亮出来啦","星星出来啦"], correctIndex: 0 },
+      { pic: "🐱", options: ["小猫喵喵叫","小狗汪汪叫","小兔蹦蹦跳"], correctIndex: 0 },
+      { pic: "🍎", options: ["我爱吃苹果","我爱吃香蕉","我爱吃橘子"], correctIndex: 0 },
+    ];
+
+    let hanziBank = []; // 每次开始随机抽取3题
+
+    // ===== 每天不同且不重复（当天内）=====
+    function dateKey(){
+      // 本地日期：YYYY-MM-DD
+      const d = new Date();
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      return `${y}-${m}-${day}`;
+    }
+    function xfnv1a(str){
+      // 简单字符串 hash -> uint32
+      let h = 2166136261;
+      for (let i = 0; i < str.length; i++){
+        h ^= str.charCodeAt(i);
+        h = Math.imul(h, 16777619);
+      }
+      return h >>> 0;
+    }
+    function mulberry32(seed){
+      let a = seed >>> 0;
+      return function(){
+        a |= 0;
+        a = (a + 0x6D2B79F5) | 0;
+        let t = Math.imul(a ^ (a >>> 15), 1 | a);
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      };
+    }
+    function dailyPickFromPool(pool, n, storageKey){
+      const today = dateKey();
+      const key = `${storageKey}:${today}`;
+      const cursorKey = `${key}:cursor`;
+      const seed = xfnv1a(key);
+      const rng = mulberry32(seed);
+
+      // 当天的洗牌序列（固定）
+      let order;
+      try{
+        order = JSON.parse(localStorage.getItem(key) || "null");
+      }catch{
+        order = null;
+      }
+      if (!Array.isArray(order) || order.length !== pool.length){
+        order = Array.from({length: pool.length}, (_, i) => i);
+        for (let i = order.length - 1; i > 0; i--){
+          const j = Math.floor(rng() * (i + 1));
+          [order[i], order[j]] = [order[j], order[i]];
+        }
+        localStorage.setItem(key, JSON.stringify(order));
+        localStorage.setItem(cursorKey, "0");
+      }
+
+      let cursor = Number.parseInt(localStorage.getItem(cursorKey) || "0", 10);
+      if (!Number.isFinite(cursor) || cursor < 0) cursor = 0;
+
+      // 取 n 个，不足则“当天内不重复”前提下循环一遍后再从头继续
+      const picked = [];
+      for (let k = 0; k < n; k++){
+        picked.push(pool[order[cursor % order.length]]);
+        cursor++;
+      }
+      localStorage.setItem(cursorKey, String(cursor));
+      return picked;
+    }
+
+    let hanziIdx = 0;
+    let hanziStars = 0;
+
+    const elHanziStars = document.getElementById("hanziStars");
+    const elHanziPic = document.getElementById("hanziPic");
+    const elHanziOptions = document.getElementById("hanziOptions");
+    const btnHanziFinish = document.getElementById("btnHanziFinish");
+    const elHanziFeedback = document.getElementById("hanziFeedback");
+
+    function renderStars(el, count, total = 3){
+      const s = Array.from({ length: total }, () => "☆").map((_, i) => i < count ? "★" : "☆");
+      el.innerHTML = s.map(ch => ch === "★" ? '<span class="on">★</span>' : "☆").join("");
+    }
+
+    function shuffleArray(arr){
+      const a = [...arr];
+      for (let i = a.length - 1; i > 0; i--){
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a;
+    }
+
+    function pickN(arr, n){
+      return shuffleArray(arr).slice(0, n);
+    }
+
+    function startHanziGame(){
+      // hanziGame 现在可能被复用为“便利店场景”，如果识字所需元素不存在就直接返回
+      if (!btnHanziFinish || !elHanziFeedback || !elHanziOptions) return;
+      // 当天内不重复；每天不同（用日期做种子）
+      hanziBank = dailyPickFromPool(hanziPool, 3, "dailyHanziOrder");
+      hanziIdx = 0;
+      hanziStars = 0;
+      btnHanziFinish.style.display = "none";
+      elHanziFeedback.textContent = "";
+      elHanziFeedback.className = "hanziFeedback";
+      renderStars(elHanziStars, hanziStars, 3);
+      renderHanziQuestion();
+    }
+
+    function renderHanziQuestion(){
+      const q = hanziBank[hanziIdx];
+      elHanziPic.textContent = q.pic;
+      elHanziOptions.innerHTML = "";
+      q.options.forEach((text, i) => {
+        const b = document.createElement("button");
+        b.className = "wordBtn";
+        b.textContent = text;
+        b.addEventListener("click", () => onHanziPick(b, i));
+        elHanziOptions.appendChild(b);
+      });
+    }
+
+    function onHanziPick(btnEl, pickIndex){
+      const q = hanziBank[hanziIdx];
+      if (pickIndex === q.correctIndex){
+        elHanziFeedback.textContent = "✅ 太棒啦！";
+        elHanziFeedback.className = "hanziFeedback ok";
+        setBubble("你真聪明！");
+        btnEl.classList.add("correct");
+        // 禁用其它按钮（正确后灰掉）
+        [...elHanziOptions.querySelectorAll(".wordBtn")].forEach(b => {
+          if (b !== btnEl){
+            b.disabled = true;
+            b.style.filter = "grayscale(.6)";
+          }
+        });
+        hanziStars = Math.min(3, hanziStars + 1);
+        renderStars(elHanziStars, hanziStars, 3);
+
+        // 自动下一题
+        window.setTimeout(() => {
+          elHanziFeedback.textContent = "";
+          elHanziFeedback.className = "hanziFeedback";
+          hanziIdx += 1;
+          if (hanziIdx >= hanziBank.length){
+            showToast("🎉 游戏完成！");
+            btnHanziFinish.style.display = "inline-flex";
+          } else {
+            renderHanziQuestion();
+          }
+        }, 650);
+      } else {
+        elHanziFeedback.textContent = "❌ 不对哦，再试试";
+        elHanziFeedback.className = "hanziFeedback bad";
+        setBubble("没关系，再想想～");
+        btnEl.classList.add("wrong");
+        window.setTimeout(() => btnEl.classList.remove("wrong"), 500);
+      }
+    }
+
+    btnHanziFinish?.addEventListener("click", () => goNext());
+
+    /***********************
+     * 算术游戏（3题固定，30以内）
+     ***********************/
+    let mathBank = []; // 每次进入随机生成3题
+
+    let mathIdx = 0;
+    let mathStars = 0;
+    let mathInput = "";
+
+    const elMathStars = document.getElementById("mathStars");
+    const elMathEq = document.getElementById("mathEquation");
+    const elMathAns = document.getElementById("mathAnswer");
+    const elMathPad = document.getElementById("mathPad");
+    const btnMathFinish = document.getElementById("btnMathFinish");
+    const elMathFeedback = document.getElementById("mathFeedback");
+
+    function genMathQuestions(n){
+      // 当天内不重复；每天不同：用日期种子生成“题目列表”，再顺序取 n 道
+      const today = dateKey();
+      const listKey = `dailyMathList:${today}`;
+      const cursorKey = `${listKey}:cursor`;
+      const seed = xfnv1a(listKey);
+      const rng = mulberry32(seed);
+
+      let list;
+      try{
+        list = JSON.parse(localStorage.getItem(listKey) || "null");
+      }catch{
+        list = null;
+      }
+
+      function listHasDup(arr){
+        const s = new Set();
+        for (const it of arr){
+          if (!it || typeof it.text !== "string") return true;
+          if (s.has(it.text)) return true;
+          s.add(it.text);
+        }
+        return false;
+      }
+      // 每天生成一份较大的题单（比如 60 道），当天循环取用也不会出现“重复题目”直到用完
+      if (!Array.isArray(list) || list.length < 30 || listHasDup(list)){
+        const seen = new Set();
+        const out = [];
+        let guard = 0;
+        while (out.length < 60 && guard < 5000){
+          guard++;
+          const isAdd = rng() < 0.6;
+          let a, b, ans, text;
+          if (isAdd){
+            a = Math.floor(rng() * 21) + 5;   // 5..25
+            b = Math.floor(rng() * 16) + 1;   // 1..16
+            ans = a + b;
+            if (ans > 30) continue;
+            text = `${a} + ${b} = ?`;
+          } else {
+            a = Math.floor(rng() * 21) + 10;  // 10..30
+            b = Math.floor(rng() * 16) + 1;   // 1..16
+            if (b > a) continue;
+            ans = a - b;
+            text = `${a} - ${b} = ?`;
+          }
+          if (seen.has(text)) continue;
+          seen.add(text);
+          out.push({ text, answer: ans });
+        }
+        // 兜底：极少情况下补齐
+        const fallback = [
+          { text: "23 + 5 = ?", answer: 28 },
+          { text: "17 - 8 = ?", answer: 9 },
+          { text: "12 + 13 = ?", answer: 25 },
+        ];
+        while (out.length < 60) out.push(fallback[out.length % fallback.length]);
+
+        list = out;
+        localStorage.setItem(listKey, JSON.stringify(list));
+        localStorage.setItem(cursorKey, "0");
+      }
+
+      let cursor = Number.parseInt(localStorage.getItem(cursorKey) || "0", 10);
+      if (!Number.isFinite(cursor) || cursor < 0) cursor = 0;
+
+      const picked = [];
+      const used = new Set();
+      let guardPick = 0;
+      while (picked.length < n && guardPick < list.length + 20){
+        guardPick++;
+        const it = list[cursor % list.length];
+        cursor++;
+        if (!it || typeof it.text !== "string") continue;
+        if (used.has(it.text)) continue; // 同一局不重复
+        used.add(it.text);
+        picked.push(it);
+      }
+      localStorage.setItem(cursorKey, String(cursor));
+
+      // 额外保险：如果不小心没凑够 n（极少），就继续从头找不重复的补齐
+      let extraGuard = 0;
+      while (picked.length < n && extraGuard < list.length){
+        extraGuard++;
+        const it = list[(cursor + extraGuard) % list.length];
+        if (!it || typeof it.text !== "string") continue;
+        if (used.has(it.text)) continue;
+        used.add(it.text);
+        picked.push(it);
+      }
+      return picked;
+    }
+
+    function startMathGame(){
+      mathBank = genMathQuestions(4);
+      mathIdx = 0;
+      mathStars = 0;
+      mathInput = "";
+      btnMathFinish.style.display = "none";
+      elMathFeedback.textContent = "";
+      elMathFeedback.className = "mathFeedback";
+      renderStars(elMathStars, mathStars, 4);
+      renderMathQuestion();
+      renderMathPad();
+      renderMathAnswer();
+    }
+
+    function renderMathQuestion(){
+      elMathEq.textContent = mathBank[mathIdx].text;
+    }
+
+    function renderMathAnswer(){
+      elMathAns.textContent = mathInput || " ";
+    }
+
+    function renderMathPad(){
+      const keys = ["1","2","3","4","5","6","7","8","9","←","0","✓"];
+      elMathPad.innerHTML = "";
+      keys.forEach(k => {
+        const b = document.createElement("button");
+        b.className = "padBtn";
+        if (k === "✓") b.classList.add("submit");
+        if (k === "←") b.classList.add("back");
+        b.textContent = k;
+        b.addEventListener("click", () => onPadPress(k));
+        elMathPad.appendChild(b);
+      });
+    }
+
+    function onPadPress(k){
+      if (k === "←"){
+        mathInput = mathInput.slice(0, -1);
+        renderMathAnswer();
+        return;
+      }
+      if (k === "✓"){
+        submitMath();
+        return;
+      }
+      if (mathInput.length >= 2) return; // 最多两位
+      mathInput += k;
+      renderMathAnswer();
+    }
+
+    function submitMath(){
+      const target = mathBank[mathIdx].answer;
+      const val = Number.parseInt(mathInput, 10);
+      if (!Number.isFinite(val)){
+        elMathFeedback.textContent = "先输入答案哦～";
+        elMathFeedback.className = "mathFeedback bad";
+        return;
+      }
+      if (val === target){
+        elMathFeedback.textContent = "✅ 太棒啦！";
+        elMathFeedback.className = "mathFeedback ok";
+        setBubble("你真聪明！");
+        mathStars = Math.min(mathBank.length, mathStars + 1);
+        renderStars(elMathStars, mathStars, mathBank.length);
+        mathInput = "";
+        renderMathAnswer();
+        const isLast = (mathIdx >= mathBank.length - 1);
+        window.setTimeout(() => {
+          mathIdx += 1;
+          if (mathIdx >= mathBank.length){
+            showToast("🎉 游戏完成！");
+            btnMathFinish.style.display = "inline-flex";
+          } else {
+            // 不是最后一题才清空提示并进入下一题
+            elMathFeedback.textContent = "";
+            elMathFeedback.className = "mathFeedback";
+            renderMathQuestion();
+          }
+        }, 500);
+      } else {
+        elMathFeedback.textContent = "❌ 不对哦，再试试";
+        elMathFeedback.className = "mathFeedback bad";
+        setBubble("没关系，再想想～");
+      }
+    }
+
+    btnMathFinish?.addEventListener("click", () => goNext());
+
+    /***********************
+     * 书面作业：倒计时 + 10分钟提醒
+     ***********************/
+    let countdownTimer = null;
+    let remindTimer = null;
+    let remainSeconds = 0;
+
+    const timerElMap = {
+      hanzi: document.getElementById("timer1"),
+      math: document.getElementById("timer2"),
+    };
+
+    // 正式：30分钟(1800s)、每10分钟提醒(600s)
+    // 演示：把 DEMO_FAST 改为 true，让“10分钟提醒”变成10秒
+    const DEMO_FAST = false;
+    const TOTAL_SECONDS = 30 * 60;
+    const REMIND_EVERY_SECONDS = DEMO_FAST ? 10 : 10 * 60;
+
+    function fmtTime(sec){
+      const m = Math.floor(sec / 60);
+      const s = sec % 60;
+      return String(m).padStart(2,"0") + ":" + String(s).padStart(2,"0");
+    }
+
+    function stopHomeworkTimers(){
+      if (countdownTimer) window.clearInterval(countdownTimer);
+      if (remindTimer) window.clearInterval(remindTimer);
+      countdownTimer = null;
+      remindTimer = null;
+    }
+
+    function startHomework(kind){
+      // 正计时：从 00:00 开始往上计
+      remainSeconds = 0;
+      timerElMap[kind].textContent = fmtTime(remainSeconds);
+      setBubble("我陪你一起写作业，加油～");
+      stopHomeworkTimers();
+
+      countdownTimer = window.setInterval(() => {
+        remainSeconds += 1;
+        timerElMap[kind].textContent = fmtTime(remainSeconds);
+        // 写满 TOTAL_SECONDS 后结束并进入下一页
+        if (remainSeconds >= TOTAL_SECONDS){
+          stopHomeworkTimers();
+          showToast("作业时间到啦！");
+          goNext();
+        }
+      }, 1000);
+
+      let remindCount = 0;
+      remindTimer = window.setInterval(() => {
+        remindCount += 1;
+        if (DEMO_FAST){
+          setBubble(`已经写了 ${remindCount * 10} 秒啦，继续坚持哦！`);
+        } else {
+          if (remindCount === 1) setBubble("已经写了10分钟啦，继续坚持哦！");
+          else if (remindCount === 2) setBubble("还有10分钟，你很棒！");
+          else setBubble("继续加油～小暖在这里陪你！");
+        }
+      }, REMIND_EVERY_SECONDS * 1000);
+    }
+
+    /***********************
+     * 摄像头模拟识别作业（模态框）
+     ***********************/
+    const camModal = document.getElementById("camModal");
+    const camTitle = document.getElementById("camTitle");
+    const camPreviewInner = document.getElementById("camPreviewInner");
+    const btnCamShot = document.getElementById("btnCamShot");
+    const btnCamCancel = document.getElementById("btnCamCancel");
+    let camContext = null; // "hanzi" | "math"
+    let camTimers = [];
+    let camStream = null;
+    let camDetectTimer = null;
+
+    function clearCamTimers(){
+      camTimers.forEach(t => window.clearTimeout(t));
+      camTimers = [];
+    }
+
+    function stopCamStream(){
+      if (camDetectTimer){
+        window.clearInterval(camDetectTimer);
+        camDetectTimer = null;
+      }
+      if (camStream){
+        camStream.getTracks().forEach(t => t.stop());
+        camStream = null;
+      }
+    }
+
+    function openCam(kind){
+      camContext = kind;
+      clearCamTimers();
+      camTitle.textContent = "举起你的作业本";
+      // 第三页：真实摄像头 + 自动检测纸张
+      if (kind === "storePaper"){
+        btnCamShot.style.display = "none";
+        btnCamShot.disabled = true;
+        camPreviewInner.innerHTML = `
+          <video id="camVideoReal" autoplay muted playsinline style="width:100%;height:100%;object-fit:cover;border-radius:16px;display:block;"></video>
+          <canvas id="camCanvasReal" style="display:none;"></canvas>
+          <div style="position:absolute;left:18px;bottom:14px;font-weight:1200;color:#fff;text-shadow:0 4px 10px rgba(0,0,0,.45);">
+            请把作业本/纸张放到镜头前
+          </div>
+          <div id="camPaperStatus" style="position:absolute;right:14px;bottom:14px;font-weight:1200;color:#fff;text-shadow:0 4px 10px rgba(0,0,0,.45);">
+            纸张检测：准备中…
+          </div>
+        `;
+      } else {
+        btnCamShot.style.display = "";
+        camPreviewInner.innerHTML = '<div class="previewIcon">📷</div><div>摄像头预览（模拟）</div>';
+        btnCamShot.disabled = false;
+      }
+      camModal.classList.add("show");
+      camModal.setAttribute("aria-hidden", "false");
+
+      if (kind === "storePaper"){
+        (async () => {
+          try{
+            stopCamStream();
+            camStream = await navigator.mediaDevices.getUserMedia({
+              // 笔记本通常只有 user 摄像头；environment 在桌面端常常会导致取流失败或行为异常
+              video: { facingMode: "user", width: { ideal: 960 }, height: { ideal: 540 } },
+              audio: false,
+            });
+            const v = document.getElementById("camVideoReal");
+            const c = document.getElementById("camCanvasReal");
+            if (!v || !c) return;
+            v.srcObject = camStream;
+            try{ await v.play(); } catch {}
+
+            let hit = 0;
+            camDetectTimer = window.setInterval(() => {
+              if (!v.videoWidth || !v.videoHeight) return;
+              const w = 240, h = 135;
+              c.width = w; c.height = h;
+              const ctx = c.getContext("2d", { willReadFrequently: true });
+              if (!ctx) return;
+              ctx.drawImage(v, 0, 0, w, h);
+              const img = ctx.getImageData(0, 0, w, h).data;
+              let paperLike = 0;
+              for (let i = 0; i < img.length; i += 4){
+                const r = img[i], g = img[i+1], b = img[i+2];
+                const lum = 0.2126*r + 0.7152*g + 0.0722*b;
+                const maxc = Math.max(r, g, b);
+                const minc = Math.min(r, g, b);
+                const sat = maxc - minc; // 低饱和更像纸张
+                if (lum > 155 && sat < 85) paperLike++;
+              }
+              const paperRatio = paperLike / (w * h);
+              const statusEl = document.getElementById("camPaperStatus");
+              if (statusEl){
+                statusEl.textContent = `纸张检测：${Math.round(paperRatio * 100)}%`;
+              }
+              // 更灵敏：阈值继续降低，并减少连续命中次数
+              if (paperRatio > 0.10){
+                hit++;
+              } else {
+                hit = Math.max(0, hit - 1);
+              }
+              if (hit >= 3){
+                hit = 0;
+                stopCamStream();
+                closeCam();
+                showPage("summary");
+              }
+            }, 220);
+          } catch (e){
+            camPreviewInner.innerHTML = '<div class="previewIcon">⚠️</div><div>摄像头权限被拒绝或不可用</div>';
+          }
+        })();
+      }
+    }
+
+    function closeCam(){
+      clearCamTimers();
+      stopCamStream();
+      camModal.classList.remove("show");
+      camModal.setAttribute("aria-hidden", "true");
+    }
+
+    btnCamCancel.addEventListener("click", () => {
+      closeCam(); // 取消：停留当前作业页，倒计时继续
+    });
+
+    btnCamShot.addEventListener("click", () => {
+      // 1) 拍照：显示静态“作业本”画面 + 识别中 loading
+      btnCamShot.disabled = true;
+      camPreviewInner.innerHTML = `
+        <div class="previewIcon">📒</div>
+        <div style="margin-top:6px;">已拍照</div>
+        <div class="loadingRow"><span class="spinner"></span><span>识别中...</span></div>
+      `;
+
+      // 2) 2秒后：识别成功
+      camTimers.push(window.setTimeout(() => {
+        camPreviewInner.innerHTML = `
+          <div class="previewIcon">✅</div>
+          <div style="margin-top:6px;font-weight:1200;color:rgba(0,0,0,.78);">识别成功！作业已完成！</div>
+        `;
+      }, 2000));
+
+      // 3) 再延迟1秒：关闭模态框并跳转
+      camTimers.push(window.setTimeout(() => {
+        closeCam();
+        // 成功提交：清理作业计时器并进入下一环节（按本次flow）
+        stopHomeworkTimers();
+        goNext();
+      }, 3000));
+    });
+
+    // 作业页右侧大按钮：打开摄像头模拟
+    document.getElementById("btnShowHW1").addEventListener("click", () => openCam("hanzi"));
+    // 第四页：点击“作业展示”进入真实摄像头识别纸张（检测到后跳总结页）
+    document.getElementById("btnShowHW2").addEventListener("click", () => openCam("storePaper"));
+
+    function resetAllProgress(){
+      stopHomeworkTimers();
+      hanziIdx = 0; hanziStars = 0;
+      mathIdx = 0; mathStars = 0; mathInput = "";
+      if (btnHanziFinish) btnHanziFinish.style.display = "none";
+      if (btnMathFinish) btnMathFinish.style.display = "none";
+      if (elHanziOptions) elHanziOptions.innerHTML = "";
+      if (elMathPad) elMathPad.innerHTML = "";
+    }
+
+    // 初始化默认对话
+    setDefaultBubble("welcome");
+    if (deviceEl) deviceEl.className = "device page-welcome";
+
+
+  </script>
+</body>
+</html>
